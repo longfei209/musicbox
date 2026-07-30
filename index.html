@@ -20,26 +20,26 @@
     <div class="list" id="songList"></div>
 
 <script>
-// ============【在这里添加歌曲，以后新增就在这里复制模板】============
+// ============歌单区域，加歌在这里复制模板========
 const songs = [
     {
         name: "演员",
         src: "music/yanyuan.mp3"
     }
-    // 新增歌曲模板，复制下面这段，修改名字和文件路径即可
     /*
+    //新增歌曲模板，去掉注释逗号再粘贴
     ,{
-        name: "歌曲名称",
-        src: "music/xxx.mp3"
+        name: "歌曲名",
+        src: "music/文件名.mp3"
     }
     */
 ];
-// ==================================================================
+// ===============================================
 
 const audio = document.getElementById('audio');
 const listBox = document.getElementById('songList');
 
-// 渲染歌单
+//渲染歌单
 songs.forEach((song,index)=>{
     let div = document.createElement('div');
     div.className = "item";
@@ -47,7 +47,6 @@ songs.forEach((song,index)=>{
     div.onclick = ()=>{
         audio.src = song.src;
         audio.play();
-        // 高亮当前播放
         document.querySelectorAll('.item').forEach(el=>el.classList.remove('active'))
         div.classList.add('active')
     }
