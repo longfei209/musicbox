@@ -2,55 +2,122 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>音乐播放器</title>
+    <title>简易播放器</title>
     <style>
-        *{margin:0;padding:0;box-sizing:border-box;font-family:system-ui}
-        body{background:#121212;color:#fff;max-width:600px;margin:40px auto;padding:20px}
-        .title{font-size:24px;margin-bottom:20px;text-align:center}
-        audio{width:100%;margin:15px 0}
-        .list{margin-top:30px}
-        .item{padding:12px 16px;background:#222;margin:8px 0;border-radius:8px;cursor:pointer}
-        .item:hover{background:#333}
-        .item.active{background:#2a4060}
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+        body {
+            background: #121212;
+            color: #fff;
+            max-width: 600px;
+            margin: 40px auto;
+            padding: 20px;
+        }
+        .title {
+            font-size: 28px;
+            text-align: center;
+            margin-bottom: 24px;
+            font-weight: 600;
+        }
+        audio {
+            width: 100%;
+            margin-bottom: 16px;
+        }
+        #listBtn {
+            width: 100%;
+            padding: 14px;
+            background: #1e1e1e;
+            border: none;
+            border-radius: 10px;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        #listBtn:hover {
+            background: #2a2a2a;
+        }
+        .songList {
+            margin-top: 16px;
+            display: none;
+        }
+        .songItem {
+            padding: 14px 18px;
+            background: #1e1e1e;
+            border-radius: 10px;
+            margin: 8px 0;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .songItem:hover {
+            background: #2a2a2a;
+        }
+        .songItem.active {
+            background: #2a4060;
+            border-left: 4px solid #4a90e2;
+        }
     </style>
 </head>
 <body>
     <h2 class="title">简易播放器</h2>
-    <audio id="audio" controls>
-    <div class="list" id="songList"></div>
+    
+    <audio id="player" controls></audio>
+    
+    <button id="listBtn">打开歌曲列表</button>
+    
+    <div class="songList" id="listContainer"></div>
 
 <script>
-// ============【在这里添加歌曲】========
+// ========== 歌单配置，以后加歌在这里写 ==========
 const songs = [
     {
         name: "演员",
         src: "music/yanyuan.mp3"
     }
-    /* 新增歌曲模板，复制使用
     ,{
-        name: "歌曲名称",
-        src: "music/文件名.mp3"
+        name: "晴天",
+        src: "music/qingtian.mp3"
     }
-    */
+    // 新增歌曲模板（复制下面这段，去掉//注释）
+    // ,{
+    //     name: "歌曲名字",
+    //     src: "music/xxx.mp3"
+    // }
 ];
-// =====================================
+// ================================================
 
-const audio = document.getElementById('audio');
-const listBox = document.getElementById('songList');
+const audio = document.getElementById("player");
+const btn = document.getElementById("listBtn");
+const listWrap = document.getElementById("listContainer");
 
 // 渲染歌单
-songs.forEach((song)=>{
-    let div = document.createElement('div');
-    div.className = "item";
+songs.forEach((song, index) => {
+    let div = document.createElement("div");
+    div.className = "songItem";
     div.innerText = song.name;
-    div.onclick = ()=>{
+    div.onclick = function() {
         audio.src = song.src;
         audio.play();
-        document.querySelectorAll('.item').forEach(el=>el.classList.remove('active'))
-        div.classList.add('active')
+        document.querySelectorAll(".songItem").forEach(el => el.classList.remove("active"));
+        this.classList.add("active");
     }
-    listBox.appendChild(div);
+    listWrap.appendChild(div);
 })
+
+// 按钮切换显示/隐藏
+btn.onclick = function() {
+    if (listWrap.style.display === "block") {
+        listWrap.style.display = "none";
+        this.innerText = "打开歌曲列表";
+    } else {
+        listWrap.style.display = "block";
+        this.innerText = "关闭歌曲列表";
+    }
+}
 </script>
 </body>
 </html>
