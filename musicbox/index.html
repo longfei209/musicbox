@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>仓库音乐播放器</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/aplayer@1.10.1/dist/APlayer.min.css">
+  <style>
+    body{background:#f0f2f5;margin-top:80px;}
+  </style>
+</head>
+<body>
+  <div id="aplayer"></div>
+  <script src="https://cdn.jsdelivr.net/npm/aplayer@1.10.1/dist/APlayer.min.js"></script>
+  <script>
+    const ap = new APlayer({
+        container: document.getElementById('aplayer'),
+        fixed: false,
+        autoplay: false,
+        loop: 'all',
+        order: 'list',
+        preload: 'auto',
+        volume: 0.7,
+        listFolded: false,
+        listMaxHeight: 300,
+        audio: [
+            {
+                name: "歌曲名称",
+                artist: "歌手",
+                url: "https://cdn.jsdelivr.net/npm/longfei209/musicbox@main/music/song.mp3",
+                cover: "https://cdn.jsdelivr.net/npm/longfei209/musicbox@main/music/cover.jpg"
+            }
+        ]
+    });
+  </script>
+</body>
+</html>
