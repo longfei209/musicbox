@@ -23,6 +23,21 @@
             margin-bottom: 24px;
             font-weight: 600;
         }
+        /* 正在播放的歌曲名 */
+        .nowPlaying {
+            text-align: center;
+            font-size: 20px;
+            font-weight: 500;
+            color: #4a90e2;
+            margin-bottom: 16px;
+            padding: 12px;
+            background: #1e1e1e;
+            border-radius: 10px;
+            min-height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
         audio {
             width: 100%;
             margin-bottom: 16px;
@@ -60,12 +75,126 @@
             background: #2a4060;
             border-left: 4px solid #4a90e2;
         }
+
+        /* ========== 新增样式 ========== */
+        .ctrl-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+        .ctrl-row button {
+            flex: 1;
+            padding: 12px;
+            background: #1e1e1e;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 15px;
+        }
+        .ctrl-row button:hover {
+            background: #2a2a2a;
+        }
+        .ctrl-row button.active {
+            background: #2a4060;
+            border: 1px solid #4a90e2;
+        }
+        .mode-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+        .mode-row button {
+            flex: 1;
+            padding: 10px;
+            background: #1e1e1e;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .mode-row button.active {
+            background: #2a4060;
+            border: 1px solid #4a90e2;
+        }
+        .search-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .search-row input {
+            flex: 1;
+            padding: 12px 14px;
+            background: #1e1e1e;
+            color: #fff;
+            border: 1px solid #333;
+            border-radius: 8px;
+            font-size: 14px;
+            outline: none;
+        }
+        .search-row input:focus {
+            border-color: #4a90e2;
+        }
+        .search-row button {
+            padding: 12px 18px;
+            background: #1e1e1e;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .search-row button:hover {
+            background: #2a2a2a;
+        }
+        /* 列表滚动条 */
+        .songList {
+            max-height: 360px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+        .songList::-webkit-scrollbar {
+            width: 6px;
+        }
+        .songList::-webkit-scrollbar-track {
+            background: #1a1a1a;
+            border-radius: 3px;
+        }
+        .songList::-webkit-scrollbar-thumb {
+            background: #444;
+            border-radius: 3px;
+        }
+        .songList::-webkit-scrollbar-thumb:hover {
+            background: #666;
+        }
     </style>
 </head>
 <body>
     <h2 class="title">简易播放器</h2>
     
+    <!-- 正在播放的歌曲名 -->
+    <div class="nowPlaying" id="nowPlaying">请选择歌曲</div>
+
     <audio id="player" controls></audio>
+
+    <!-- 上一曲 / 下一曲 -->
+    <div class="ctrl-row">
+        <button id="prevBtn">⏮ 上一曲</button>
+        <button id="nextBtn">下一曲 ⏭</button>
+    </div>
+
+    <!-- 播放模式 -->
+    <div class="mode-row">
+        <button id="modeOrder" class="active">顺序播放</button>
+        <button id="modeRandom">随机播放</button>
+    </div>
+
+    <!-- 搜索框 -->
+    <div class="search-row">
+        <input type="text" id="searchInput" placeholder="搜索歌曲名...">
+        <button id="searchBtn">搜索</button>
+    </div>
     
     <button id="listBtn">打开歌曲列表</button>
     
@@ -76,23 +205,91 @@
 const songs = [
     {
         name: "演员",
-        src: "music/yanyuan.mp3"
+        src: "music/1.mp3"
     }
     ,{
         name: "晴天",
-        src: "music/qingtian.mp3"
+        src: "music/2.mp3"
     }
-    // 新增歌曲模板（复制下面这段，去掉//注释）
-    // ,{
-    //     name: "歌曲名字",
-    //     src: "music/xxx.mp3"
-    // }
+    ,{
+        name: "青花瓷",
+        src: "music/3.mp3"
+    }
+    ,{
+        name: "稻香",
+        src: "music/4.mp3"
+    }
+    ,{
+        name: "告白气球",
+        src: "music/5.mp3"
+    }
+    ,{
+        name: "搁浅",
+        src: "music/6.mp3"
+    }
+    ,{
+        name: "天地龙鳞",
+        src: "music/7.mp3"
+    }
+    ,{
+        name: "奢香夫人",
+        src: "music/8.mp3"
+    }
+    ,{
+        name: "离别开出花",
+        src: "music/9.mp3"
+    }
+    ,{
+        name: "恋人",
+        src: "music/10.mp3"
+    }
+    ,{
+        name: "红色高跟鞋",
+        src: "music/11.mp3"
+    }
+    ,{
+        name: "后会无期",
+        src: "music/12.mp3"
+    }
+    ,{
+        name: "爱错",
+        src: "music/13.mp3"
+    }
+    ,{
+        name: "天下",
+        src: "music/14.mp3"
+    }
+    ,{
+        name: "偏爱",
+        src: "music/15.mp3"
+    }
+    ,{
+        name: "虞兮叹",
+        src: "music/16.mp3"
+    }
+    ,{
+        name: "泡沫",
+        src: "music/17.mp3"
+    }
+    ,{
+        name: "水手",
+        src: "music/18.mp3"
+    }
+    ,{
+        name: "童话",
+        src: "music/19.mp3"
+    }
+    ,{
+        name: "成都",
+        src: "music/20.mp3"
+    }
 ];
 // ================================================
 
 const audio = document.getElementById("player");
 const btn = document.getElementById("listBtn");
 const listWrap = document.getElementById("listContainer");
+const nowPlaying = document.getElementById("nowPlaying"); // 歌曲名显示元素
 
 // 渲染歌单
 songs.forEach((song, index) => {
@@ -104,6 +301,8 @@ songs.forEach((song, index) => {
         audio.play();
         document.querySelectorAll(".songItem").forEach(el => el.classList.remove("active"));
         this.classList.add("active");
+        currentIndex = index;
+        nowPlaying.innerText = "正在播放：" + song.name; // 更新歌曲名
     }
     listWrap.appendChild(div);
 })
@@ -118,6 +317,113 @@ btn.onclick = function() {
         this.innerText = "关闭歌曲列表";
     }
 }
+
+// ========== 以下是新增功能代码（原代码完全不动） ==========
+
+let currentIndex = 0;      // 当前播放歌曲索引
+let playMode = "order";    // 播放模式：order顺序 / random随机
+
+const prevBtn = document.getElementById("prevBtn");
+const nextBtn = document.getElementById("nextBtn");
+const modeOrderBtn = document.getElementById("modeOrder");
+const modeRandomBtn = document.getElementById("modeRandom");
+const searchInput = document.getElementById("searchInput");
+const searchBtn = document.getElementById("searchBtn");
+
+// 根据索引播放歌曲
+function playByIndex(idx) {
+    if (idx < 0) idx = songs.length - 1;
+    if (idx >= songs.length) idx = 0;
+    currentIndex = idx;
+    const song = songs[currentIndex];
+    audio.src = song.src;
+    audio.play();
+    nowPlaying.innerText = "正在播放：" + song.name; // 更新歌曲名
+
+    // 更新激活样式
+    const items = document.querySelectorAll(".songItem");
+    items.forEach((el, i) => {
+        el.classList.toggle("active", i === currentIndex);
+    });
+}
+
+// 下一曲（根据模式）
+function playNext() {
+    if (playMode === "random") {
+        let r;
+        do {
+            r = Math.floor(Math.random() * songs.length);
+        } while (r === currentIndex && songs.length > 1);
+        playByIndex(r);
+    } else {
+        playByIndex(currentIndex + 1);
+    }
+}
+
+// 上一曲（根据模式）
+function playPrev() {
+    if (playMode === "random") {
+        let r;
+        do {
+            r = Math.floor(Math.random() * songs.length);
+        } while (r === currentIndex && songs.length > 1);
+        playByIndex(r);
+    } else {
+        playByIndex(currentIndex - 1);
+    }
+}
+
+prevBtn.onclick = playPrev;
+nextBtn.onclick = playNext;
+
+// 播放结束自动下一首
+audio.addEventListener("ended", playNext);
+
+// 切换播放模式
+modeOrderBtn.onclick = function() {
+    playMode = "order";
+    modeOrderBtn.classList.add("active");
+    modeRandomBtn.classList.remove("active");
+};
+modeRandomBtn.onclick = function() {
+    playMode = "random";
+    modeRandomBtn.classList.add("active");
+    modeOrderBtn.classList.remove("active");
+};
+
+// 搜索功能
+function doSearch() {
+    const keyword = searchInput.value.trim().toLowerCase();
+    const items = document.querySelectorAll(".songItem");
+    let firstMatch = -1;
+
+    items.forEach((el, i) => {
+        const name = songs[i].name.toLowerCase();
+        if (name.includes(keyword)) {
+            el.style.display = "block";
+            if (firstMatch === -1) firstMatch = i;
+        } else {
+            el.style.display = "none";
+        }
+    });
+
+    // 如果列表是关闭的，自动打开
+    if (keyword && listWrap.style.display !== "block") {
+        listWrap.style.display = "block";
+        btn.innerText = "关闭歌曲列表";
+    }
+
+    // 清空搜索时恢复全部显示
+    if (!keyword) {
+        items.forEach(el => el.style.display = "block");
+    }
+}
+
+searchBtn.onclick = doSearch;
+searchInput.addEventListener("input", doSearch);
+searchInput.addEventListener("keydown", function(e) {
+    if (e.key === "Enter") doSearch();
+});
 </script>
 </body>
 </html>
