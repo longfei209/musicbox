@@ -1,0 +1,1273 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>传奇 · 黑白</title>
+<style>
+:root{
+  --bg:#0a0a0a; --panel:#151515; --panel2:#1e1e1e; --panel3:#262626;
+  --line:#333; --line2:#444;
+  --tx:#e8e8e8; --tx2:#aaa; --tx3:#777; --tx4:#555;
+  --q1:#888; --q2:#aaa; --q3:#ddd; --q4:#fff;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;}
+body{
+  background:var(--bg); color:var(--tx);
+  font:14px/1.5 -apple-system,"PingFang SC","Microsoft YaHei",monospace,sans-serif;
+  max-width:720px; margin:0 auto; min-height:100%;
+}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;}
+input,select{font:inherit;}
+
+/* ========== 通用 ========== */
+.btn{
+  display:block; width:100%; padding:10px; margin:4px 0;
+  background:var(--panel2); color:var(--tx);
+  border:1px solid var(--line2); border-radius:4px;
+  text-align:center; transition:.12s;
+}
+.btn:active{background:#2e2e2e;}
+.btn.primary{background:#2a2a2a; border-color:#666;}
+.btn.ghost{background:transparent; border-color:var(--line); color:var(--tx2);}
+.btn.danger{border-color:#5a2a2a; color:#d99;}
+.btn.sm{display:inline-block; width:auto; padding:6px 10px; margin:3px 3px 3px 0; font-size:13px;}
+.row{display:flex; gap:6px; flex-wrap:wrap; align-items:center;}
+.row .btn{flex:1; min-width:0;}
+
+.panel{background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:10px; margin:8px 0;}
+.panel h3{font-size:15px; margin-bottom:8px; color:var(--tx); font-weight:600;}
+.panel h4{font-size:13px; margin:8px 0 4px; color:var(--tx2);}
+.dim{color:var(--tx3);}
+.mono{font-family:ui-monospace,Menlo,Consolas,monospace;}
+
+/* 品质颜色 */
+.q-normal{color:var(--q1);}
+.q-good{color:var(--q2);}
+.q-fine{color:var(--q3);}
+.q-epic{color:var(--q4); font-weight:700;}
+.q-epic::before{content:"★ ";}
+
+/* 血条 */
+.bar{height:14px; background:#0e0e0e; border:1px solid var(--line2); border-radius:3px; overflow:hidden; position:relative;}
+.bar>i{display:block; height:100%; background:#e0e0e0; transition:width .18s;}
+.bar.hp>i{background:#ddd;}
+.bar.exp>i{background:#777;}
+.bar>.txt{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:11px; color:#000; text-shadow:0 0 2px #fff,0 0 2px #fff;}
+
+/* ========== 顶部状态栏 ========== */
+.topbar{position:sticky; top:0; z-index:40; background:var(--bg); border-bottom:1px solid var(--line); padding:8px 10px;}
+.topbar .l1{display:flex; justify-content:space-between; font-size:13px; margin-bottom:4px;}
+.topbar .l2{display:flex; gap:8px; font-size:12px; color:var(--tx2); margin-bottom:6px;}
+.topbar .l2 span{white-space:nowrap;}
+
+/* ========== 主界面 ========== */
+#main{padding:10px; padding-bottom:40px;}
+.hint{font-size:12px; color:var(--tx3); margin:4px 0;}
+
+/* ========== 楼层怪物卡 ========== */
+.mon-card{background:var(--panel); border:1px solid var(--line); border-radius:5px; padding:8px; margin:6px 0;}
+.mon-card .name{font-size:14px;}
+.mon-card .meta{font-size:12px; color:var(--tx3); margin:2px 0 6px;}
+.mon-card.dead{opacity:.4;}
+.boss-card{border-color:#555; background:var(--panel2);}
+
+/* ========== 全屏战斗界面 ========== */
+#battle{
+  position:fixed; inset:0; z-index:120; background:var(--bg);
+  display:flex; flex-direction:column;
+  max-width:720px; margin:0 auto;
+}
+#battle.hidden{display:none;}
+#battle .b-top{padding:8px 10px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; font-size:13px; color:var(--tx2);}
+#battle .b-mon{padding:16px 10px 10px; text-align:center;}
+#battle .b-mon .avatar{font-size:44px; line-height:1; margin-bottom:6px; filter:grayscale(1);}
+#battle .b-mon .mname{font-size:17px; margin-bottom:6px;}
+#battle .b-mon .bar{max-width:320px; margin:0 auto;}
+#battle .b-me{padding:8px 10px; border-top:1px solid var(--line); border-bottom:1px solid var(--line);}
+#battle .b-me .row1{display:flex; justify-content:space-between; font-size:12px; color:var(--tx2); margin-bottom:4px;}
+#battle .b-me .bar{max-width:100%;}
+#battle .b-log{
+  flex:1; overflow-y:auto; padding:8px 10px;
+  background:#0d0d0d; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12px;
+  color:var(--tx2); line-height:1.6;
+}
+#battle .b-log .l-me{color:#e8e8e8;}
+#battle .b-log .l-mon{color:#999;}
+#battle .b-log .l-sys{color:#777;}
+#battle .b-log .l-good{color:#fff;}
+#battle .b-log .l-bad{color:#b88;}
+#battle .b-ctrl{padding:8px 10px 12px; border-top:1px solid var(--line);}
+#battle .tip{font-size:12px; color:var(--tx3); min-height:16px; margin-bottom:4px;}
+
+/* ========== 弹窗（地图/楼层/背包/装备/商店/洗练/任务） ========== */
+.overlay{position:fixed; inset:0; z-index:100; background:rgba(0,0,0,.72); display:flex; align-items:flex-end; justify-content:center;}
+.overlay.hidden{display:none;}
+.sheet{
+  width:100%; max-width:720px; max-height:88vh; overflow-y:auto;
+  background:var(--panel); border-top:1px solid var(--line2);
+  border-radius:12px 12px 0 0; padding:14px 12px 18px;
+}
+.sheet h3{font-size:16px; margin-bottom:8px;}
+.sheet .close-row{position:sticky; bottom:0; background:var(--panel); padding-top:8px;}
+
+/* ========== Toast ========== */
+#toast{
+  position:fixed; left:50%; bottom:80px; transform:translateX(-50%);
+  background:#222; color:#eee; border:1px solid #444;
+  padding:8px 14px; border-radius:20px; font-size:13px;
+  z-index:300; opacity:0; pointer-events:none; transition:.25s;
+}
+#toast.on{opacity:1;}
+
+/* ========== 简单确认框 ========== */
+#confirm{position:fixed; inset:0; z-index:200; background:rgba(0,0,0,.7); display:flex; align-items:center; justify-content:center; padding:20px;}
+#confirm.hidden{display:none;}
+#confirm .box{background:var(--panel2); border:1px solid var(--line2); border-radius:8px; padding:16px; max-width:340px; width:100%;}
+#confirm .msg{font-size:14px; margin-bottom:14px;}
+</style>
+</head>
+<body>
+
+<!-- ======= 顶部状态栏 ======= -->
+<div class="topbar">
+  <div class="l1">
+    <span>Lv.<b id="tLv">1</b> <span class="dim">|</span> 金币 <b id="tGold">0</b></span>
+    <span class="dim">红药 <b id="tPotion">0</b> · 材料 <b id="tMat">0</b></span>
+  </div>
+  <div class="bar hp" style="margin-bottom:4px;"><i id="tHpBar"></i><div class="txt" id="tHpTxt">0/0</div></div>
+  <div class="bar exp"><i id="tExpBar"></i><div class="txt" id="tExpTxt">0/0</div></div>
+  <div class="l2" style="margin-top:6px;">
+    <span>攻 <b id="tAtk">0</b></span>
+    <span>防 <b id="tDef">0</b></span>
+    <span id="tLoc" class="dim">未选择地图</span>
+  </div>
+</div>
+
+<!-- ======= 主界面 ======= -->
+<div id="main">
+  <div class="panel">
+    <div class="row">
+      <button class="btn sm" onclick="UI.openArea()">选择地图</button>
+      <button class="btn sm" onclick="UI.openWorn()">人物</button>
+      <button class="btn sm" onclick="UI.openBag()">背包</button>
+    </div>
+    <div class="row">
+      <button class="btn sm" onclick="UI.openShop()">商店</button>
+      <button class="btn sm" onclick="UI.openQuest()">任务</button>
+      <button class="btn sm" onclick="Save.manual()">存档</button>
+      <button class="btn sm" onclick="Save.load()">读档</button>
+      <button class="btn sm ghost" onclick="Save.reset()">重置</button>
+    </div>
+  </div>
+  <div id="mainInfo"></div>
+</div>
+
+<!-- ======= 全屏战斗界面 ======= -->
+<div id="battle" class="hidden">
+  <div class="b-top">
+    <span id="bLoc">战斗</span>
+    <button class="btn sm ghost" style="margin:0;" onclick="Combat.quit()">退出</button>
+  </div>
+  <div class="b-mon">
+    <div class="avatar" id="bMonAvatar">👹</div>
+    <div class="mname" id="bMonName">—</div>
+    <div class="bar hp"><i id="bMonHpBar" style="width:100%"></i><div class="txt" id="bMonHpTxt">0/0</div></div>
+  </div>
+  <div class="b-me">
+    <div class="row1"><span>我方</span><span id="bPotTip">红药 0</span></div>
+    <div class="bar hp"><i id="bMeHpBar" style="width:100%"></i><div class="txt" id="bMeHpTxt">0/0</div></div>
+  </div>
+  <div class="b-log" id="bLog"></div>
+  <div class="b-ctrl">
+    <div class="tip" id="bTip"></div>
+    <div class="row" style="margin-bottom:6px;">
+      <button class="btn primary" onclick="Combat.attack()">攻击</button>
+      <button class="btn" id="bSkillBtn" onclick="Combat.skill()">烈火剑法</button>
+      <button class="btn" onclick="Combat.potion()">喝红药</button>
+    </div>
+    <div class="row">
+      <button class="btn" id="bAutoBtn" onclick="Combat.toggleAuto()">自动战斗</button>
+      <button class="btn danger" onclick="Combat.flee()">逃跑</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======= 通用弹窗容器 ======= -->
+<div id="overlay" class="overlay hidden"><div class="sheet" id="sheet"></div></div>
+
+<!-- ======= Toast / Confirm ======= -->
+<div id="toast"></div>
+<div id="confirm" class="hidden"><div class="box"><div class="msg" id="cfmMsg"></div><div class="row"><button class="btn ghost" id="cfmNo">取消</button><button class="btn primary" id="cfmYes">确定</button></div></div></div>
+
+<script>
+/* ============================================================
+ *  传奇 · 黑白  ——  完全重写版
+ *  模块：CFG / Game / Save / UI / Combat / Quest / Render
+ * ============================================================ */
+
+/* ---------------- 通用工具 ---------------- */
+const $ = id => document.getElementById(id);
+const uid = () => Math.random().toString(36).slice(2,9);
+const rnd = (a,b) => a + Math.floor(Math.random()*(b-a+1));
+const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+const fmt = n => Math.floor(n).toLocaleString('en-US');
+
+function toast(msg){
+  const t = $('toast'); t.textContent = msg; t.classList.add('on');
+  clearTimeout(t._t); t._t = setTimeout(()=>t.classList.remove('on'), 1500);
+}
+function confirmBox(msg, onYes){
+  $('cfmMsg').textContent = msg;
+  const box = $('confirm'); box.classList.remove('hidden');
+  const yes = $('cfmYes'), no = $('cfmNo');
+  const close = ()=>{ box.classList.add('hidden'); yes.onclick=null; no.onclick=null; };
+  yes.onclick = ()=>{ close(); onYes && onYes(); };
+  no.onclick  = ()=>{ close(); };
+}
+
+/* ============================================================
+ *  配置层
+ * ============================================================ */
+const QUALITY = {
+  normal:{ k:'normal', name:'普通', cls:'q-normal', rate:0,    w:0.60 },
+  good:  { k:'good',   name:'优秀', cls:'q-good',   rate:0.15, w:0.25 },
+  fine:  { k:'fine',   name:'精良', cls:'q-fine',   rate:0.30, w:0.12 },
+  epic:  { k:'epic',   name:'史诗', cls:'q-epic',   rate:0.55, w:0.03 }
+};
+const DECOMP_MAT = { normal:1, good:2, fine:4, epic:8 };
+
+const EQUIP_BASE = {
+  "木剑":     {slot:"weapon", atk:8,  def:0,  buy:200,  sell:80},
+  "铁剑":     {slot:"weapon", atk:16, def:2,  buy:600,  sell:240},
+  "屠龙":     {slot:"weapon", atk:38, def:8,  buy:4500, sell:1800},
+  "魔龙斩":   {slot:"weapon", atk:48, def:12, buy:6000, sell:3000},
+  "布帽":     {slot:"helmet", atk:0,  def:4,  buy:120,  sell:48},
+  "战神头盔": {slot:"helmet", atk:6,  def:14, buy:2200, sell:880},
+  "布衣":     {slot:"cloth",  atk:0,  def:6,  buy:180,  sell:72},
+  "战神铠甲": {slot:"cloth",  atk:8,  def:22, buy:3200, sell:1280},
+  "布鞋":     {slot:"shoe",   atk:0,  def:3,  buy:100,  sell:40},
+  "战神战靴": {slot:"shoe",   atk:4,  def:12, buy:1800, sell:720},
+  "兽皮腰带": {slot:"belt",   atk:0,  def:4,  buy:110,  sell:44},
+  "战神腰带": {slot:"belt",   atk:5,  def:13, buy:2000, sell:800},
+  "青铜戒指": {slot:"ring",   atk:4,  def:2,  buy:140,  sell:56},
+  "力量戒指": {slot:"ring",   atk:14, def:8,  buy:2600, sell:1040},
+  "木项链":   {slot:"neck",   atk:3,  def:2,  buy:130,  sell:52},
+  "魔龙项链": {slot:"neck",   atk:18, def:14, buy:4800, sell:2400}
+};
+const SLOT_NAME = { weapon:"武器", helmet:"帽子", cloth:"衣服", shoe:"鞋子", belt:"腰带", ring:"戒指", neck:"项链" };
+const SHOP_LIST = ["木剑","铁剑","布帽","战神头盔","布衣","战神铠甲","布鞋","战神战靴","兽皮腰带","战神腰带","青铜戒指","力量戒指","木项链"];
+
+const AREAS = [
+  {
+    id:"grass", name:"新手草原", unlock:true,
+    floors:[
+      { monsters:[{id:"wolf",name:"野狼",hp:120,atk:12,def:4,exp:60,gMin:20,gMax:60}],
+        boss:{id:"wolfKing",name:"狼王",hp:350,atk:18,def:6,exp:180,gMin:80,gMax:160} },
+      { monsters:[{id:"boar",name:"野猪",hp:180,atk:16,def:6,exp:90,gMin:30,gMax:80}],
+        boss:{id:"boarKing",name:"野猪王",hp:450,atk:24,def:9,exp:240,gMin:100,gMax:200} },
+      { monsters:[{id:"hyena",name:"鬣狗",hp:240,atk:22,def:9,exp:130,gMin:40,gMax:100}],
+        boss:{id:"grassBoss",name:"草原霸主",hp:600,atk:30,def:12,exp:350,gMin:150,gMax:300} }
+    ]
+  },
+  {
+    id:"orc", name:"兽人古墓", unlock:true,
+    floors:[
+      { monsters:[{id:"orcSlave",name:"兽人奴隶",hp:320,atk:28,def:12,exp:180,gMin:60,gMax:140}],
+        boss:{id:"orcGuard",name:"兽人守卫长",hp:750,atk:38,def:16,exp:420,gMin:200,gMax:350} },
+      { monsters:[{id:"orcWar",name:"兽人战士",hp:420,atk:34,def:15,exp:240,gMin:80,gMax:180}],
+        boss:{id:"orcCaptain",name:"兽人队长",hp:900,atk:44,def:20,exp:520,gMin:240,gMax:420} },
+      { monsters:[{id:"orcSham",name:"兽人术士",hp:380,atk:42,def:13,exp:280,gMin:100,gMax:220}],
+        boss:{id:"orcKing",name:"兽人之王",hp:1200,atk:52,def:24,exp:700,gMin:320,gMax:550} }
+    ]
+  },
+  {
+    id:"pig", name:"猪洞", unlock:true,
+    floors:[
+      { monsters:[{id:"pigSoldier",name:"黑猪",hp:550,atk:40,def:18,exp:320,gMin:110,gMax:240}],
+        boss:{id:"pigBoss1",name:"红猪统领",hp:1300,atk:50,def:26,exp:780,gMin:340,gMax:600} },
+      { monsters:[{id:"pigAx",name:"白猪",hp:680,atk:48,def:22,exp:400,gMin:140,gMax:290}],
+        boss:{id:"pigBoss2",name:"白猪王",hp:1500,atk:58,def:30,exp:900,gMin:400,gMax:700} },
+      { monsters:[{id:"pigMag",name:"野猪法师",hp:620,atk:56,def:20,exp:460,gMin:170,gMax:340}],
+        boss:{id:"zhuDemon",name:"猪魔教主",hp:1800,atk:64,def:34,exp:1100,gMin:480,gMax:820} }
+    ]
+  },
+  {
+    id:"zuma", name:"祖玛神殿", unlock:true,
+    floors:[
+      { monsters:[{id:"zumaGuard",name:"祖玛卫士",hp:780,atk:54,def:28,exp:520,gMin:200,gMax:380}],
+        boss:{id:"zumaCap",name:"祖玛队长",hp:1700,atk:66,def:36,exp:1050,gMin:460,gMax:780} },
+      { monsters:[{id:"zumaArcher",name:"祖玛弓箭手",hp:700,atk:62,def:24,exp:580,gMin:230,gMax:420}],
+        boss:{id:"zumaPriest",name:"祖玛祭司",hp:1900,atk:72,def:38,exp:1200,gMin:520,gMax:880} },
+      { monsters:[{id:"zumaWar",name:"祖玛战将",hp:880,atk:68,def:32,exp:660,gMin:270,gMax:480}],
+        boss:{id:"zumaDemon",name:"祖玛教主",hp:2400,atk:80,def:44,exp:1450,gMin:620,gMax:1050, unlockDragon:true} }
+    ]
+  },
+  {
+    id:"redMoon", name:"赤月巢穴", unlock:true,
+    floors:[
+      { monsters:[{id:"spider1",name:"月魔蜘蛛",hp:950,atk:70,def:34,exp:720,gMin:300,gMax:520}],
+        boss:{id:"spiderBoss1",name:"血魔",hp:2200,atk:84,def:42,exp:1350,gMin:600,gMax:980} },
+      { monsters:[{id:"spider2",name:"钢牙蜘蛛",hp:1100,atk:78,def:38,exp:820,gMin:340,gMax:580}],
+        boss:{id:"spiderBoss2",name:"金刚",hp:2500,atk:90,def:48,exp:1500,gMin:680,gMax:1100} },
+      { monsters:[{id:"spider3",name:"恶魔蜘蛛",hp:1250,atk:86,def:42,exp:920,gMin:380,gMax:640}],
+        boss:{id:"redMoonBoss",name:"赤月恶魔",hp:3000,atk:98,def:54,exp:1800,gMin:800,gMax:1300, unlockDragon:true} }
+    ]
+  },
+  {
+    id:"dragonCity", name:"魔龙城", unlock:false,
+    floors:[
+      { monsters:[{id:"dragonSoldier",name:"魔龙刀兵",hp:1100,atk:52,def:22,exp:1300,gMin:800,gMax:1300}],
+        boss:{id:"dragonMinBoss",name:"魔龙守卫",hp:2400,atk:64,def:28,exp:2600,gMin:1400,gMax:2200} },
+      { monsters:[{id:"dragonArcher",name:"魔龙弓箭手",hp:950,atk:56,def:20,exp:1200,gMin:750,gMax:1200}],
+        boss:{id:"dragonVice",name:"魔龙副将",hp:2700,atk:68,def:32,exp:2800,gMin:1500,gMax:2400} },
+      { monsters:[{id:"dragonKnight",name:"魔龙骑士",hp:1300,atk:60,def:26,exp:1450,gMin:900,gMax:1450}],
+        boss:{id:"dragonMaster",name:"魔龙教主",hp:2200,atk:70,def:30,exp:3000,gMin:1800,gMax:3000, dropEquip:["魔龙斩","魔龙项链"]} }
+    ]
+  }
+];
+const AREA_MAP = Object.fromEntries(AREAS.map(a=>[a.id,a]));
+
+const RESPAWN_MON = 30*1000;
+const RESPAWN_BOSS = 120*1000;
+const QUEST_POOL_CD = 120*1000;
+const POTION_PRICE = 50;
+const SKILL_CD_TURNS = 3;
+const AUTO_POTION_THRESHOLD = 0.30;   // 自动喝药阈值 30%
+
+/* ============================================================
+ *  数据层
+ * ============================================================ */
+const Game = {
+  player:null, bag:[], worn:null,
+  mat:0, areaState:{}, flags:{ dragonCity:false },
+  quest:{ doing:[], avail:[], refreshTs:0 },
+  ui:{ areaId:null, floorIdx:null },
+  battle:null,
+  stats:{ kills:0, deaths:0 }
+};
+
+function initGame(){
+  Game.player = { lv:1, exp:0, hp:100, maxHp:100, baseAtk:10, baseDef:5,
+                  gold:100, potion:5, bagMax:30 };
+  Game.bag = [];
+  Game.worn = { weapon:null, helmet:null, cloth:null, shoe:null, belt:null, ring:null, neck:null };
+  Game.mat = 0;
+  Game.areaState = {};
+  Game.flags = { dragonCity:false };
+  Game.quest = { doing:[], avail:[], refreshTs: Date.now() - QUEST_POOL_CD - 1000 };
+  Game.ui = { areaId:null, floorIdx:null };
+  Game.battle = null;
+  Game.stats = { kills:0, deaths:0 };
+  Quest.refreshPool(true);
+}
+
+/* ---- 装备实例 ---- */
+function rollQuality(){
+  const r = Math.random();
+  if(r < 0.03) return 'epic';
+  if(r < 0.15) return 'fine';
+  if(r < 0.40) return 'good';
+  return 'normal';
+}
+function makeEquip(name, quality){
+  const base = EQUIP_BASE[name];
+  return {
+    uid: uid(), name, slot: base.slot,
+    baseAtk: base.atk, baseDef: base.def,
+    quality: quality || rollQuality(),
+    refineAtk:0, refineDef:0, refineHp:0, refineTimes:0
+  };
+}
+function equipStat(eq){
+  const r = QUALITY[eq.quality].rate;
+  return {
+    atk: Math.floor((eq.baseAtk + eq.refineAtk) * (1 + r)),
+    def: Math.floor((eq.baseDef + eq.refineDef) * (1 + r)),
+    hp:  eq.refineHp
+  };
+}
+function calcAttr(){
+  let atk = Game.player.baseAtk, def = Game.player.baseDef, addHp = 0;
+  for(const s in Game.worn){
+    const e = Game.worn[s]; if(!e) continue;
+    const t = equipStat(e);
+    atk += t.atk; def += t.def; addHp += t.hp;
+  }
+  return { atk, def, addHp };
+}
+function playerMaxHp(){ return Game.player.maxHp + calcAttr().addHp; }
+
+function addExp(v){
+  const p = Game.player;
+  p.exp += v;
+  let leveled = false;
+  while(p.exp >= p.lv * 120){
+    p.exp -= p.lv * 120;
+    p.lv++;
+    p.baseAtk += 4; p.baseDef += 2; p.maxHp += 25;
+    leveled = true;
+  }
+  if(leveled){ p.hp = playerMaxHp(); toast("升级！Lv." + p.lv); Save.auto(); }
+  Render.top();
+}
+
+/* ---- 区域状态 ---- */
+function areaState(id){
+  if(!Game.areaState[id]){
+    const def = AREA_MAP[id];
+    Game.areaState[id] = {
+      floors: def.floors.map(()=>({ mark:false, monDeath:{}, bossDeath:0 }))
+    };
+  }
+  return Game.areaState[id];
+}
+function tickRespawn(areaId, fi){
+  const st = areaState(areaId).floors[fi];
+  const def = AREA_MAP[areaId].floors[fi];
+  const now = Date.now();
+  def.monsters.forEach(m=>{
+    const ts = st.monDeath[m.id];
+    if(ts && now - ts >= RESPAWN_MON) delete st.monDeath[m.id];
+  });
+  if(st.bossDeath && now - st.bossDeath >= RESPAWN_BOSS) st.bossDeath = 0;
+}
+
+/* ============================================================
+ *  存档层
+ * ============================================================ */
+const Save = {
+  KEY: 'legend_bw_v2',
+  pack(){
+    return {
+      v:2,
+      player: Game.player, bag: Game.bag, worn: Game.worn,
+      mat: Game.mat, areaState: Game.areaState, flags: Game.flags,
+      quest: Game.quest, stats: Game.stats, ui: Game.ui
+    };
+  },
+  write(silent){
+    try{ localStorage.setItem(this.KEY, JSON.stringify(this.pack())); if(!silent) toast("已存档"); }
+    catch(e){ toast("存档失败"); }
+  },
+  manual(){ this.write(false); },
+  auto(){ this.write(true); },
+  load(){
+    const s = localStorage.getItem(this.KEY);
+    if(!s) return toast("无存档");
+    try{
+      const d = JSON.parse(s);
+      if(d.v !== 2) return toast("存档版本不符");
+      Object.assign(Game, {
+        player: d.player, bag: d.bag, worn: d.worn,
+        mat: d.mat, areaState: d.areaState, flags: d.flags,
+        quest: d.quest, stats: d.stats, ui: d.ui || { areaId:null, floorIdx:null },
+        battle: null
+      });
+      Render.top(); Render.main();
+      UI.close();
+      toast("读档完成");
+    }catch(e){ toast("读档失败"); }
+  },
+  reset(){
+    confirmBox("确定全部重置？此操作不可撤销。", ()=>{
+      localStorage.removeItem(this.KEY);
+      initGame();
+      Render.top(); Render.main(); UI.close();
+      toast("已重置");
+    });
+  }
+};
+
+/* ============================================================
+ *  渲染层
+ * ============================================================ */
+const Render = {
+  top(){
+    const p = Game.player, a = calcAttr();
+    const mHp = playerMaxHp();
+    $('tLv').textContent = p.lv;
+    $('tGold').textContent = fmt(p.gold);
+    $('tPotion').textContent = p.potion;
+    $('tMat').textContent = Game.mat;
+    $('tAtk').textContent = a.atk;
+    $('tDef').textContent = a.def;
+    const hpP = clamp(p.hp / mHp, 0, 1);
+    $('tHpBar').style.width = (hpP*100) + '%';
+    $('tHpTxt').textContent = Math.floor(p.hp) + '/' + mHp;
+    const need = p.lv * 120;
+    $('tExpBar').style.width = clamp(p.exp/need,0,1)*100 + '%';
+    $('tExpTxt').textContent = p.exp + '/' + need;
+    if(Game.ui.areaId != null && Game.ui.floorIdx != null){
+      const ar = AREA_MAP[Game.ui.areaId];
+      $('tLoc').textContent = ar.name + ' 第' + (Game.ui.floorIdx+1) + '层';
+    }else{
+      $('tLoc').textContent = '未选择地图';
+    }
+  },
+
+  main(){
+    const box = $('mainInfo');
+    if(Game.ui.areaId == null || Game.ui.floorIdx == null){
+      box.innerHTML = `<div class="panel"><div class="dim">点击「选择地图」开始冒险。</div></div>`;
+      return;
+    }
+    const ar = AREA_MAP[Game.ui.areaId];
+    const fi = Game.ui.floorIdx;
+    tickRespawn(ar.id, fi);
+    const st = areaState(ar.id).floors[fi];
+    const def = ar.floors[fi];
+    let html = `<div class="panel">
+      <h3>${ar.name} · 第${fi+1}层</h3>
+      <div class="dim" style="font-size:12px;margin-bottom:6px;">印记：${st.mark?'✔ 已点亮':'✘ 未点亮'}</div>`;
+
+    def.monsters.forEach(m=>{
+      const dead = !!st.monDeath[m.id];
+      html += `<div class="mon-card ${dead?'dead':''}">
+        <div class="name">${m.name}</div>
+        <div class="meta">HP ${fmt(m.hp)} · 攻 ${m.atk} · 防 ${m.def} · 经验 ${m.exp} ${dead?'【等待复活】':''}</div>
+        ${dead?'':'<button class="btn sm" onclick="Combat.start(\''+m.id+'\',false)">挑战</button>'}
+      </div>`;
+    });
+
+    const boss = def.boss;
+    const bDead = !!st.bossDeath;
+    html += `<div class="mon-card boss-card ${bDead?'dead':''}">
+      <div class="name">👹 ${boss.name} <span class="dim">BOSS</span></div>
+      <div class="meta">HP ${fmt(boss.hp)} · 攻 ${boss.atk} · 防 ${boss.def} · 经验 ${boss.exp} ${bDead?'【等待复活】':''}</div>
+      ${bDead?'':'<button class="btn sm" onclick="Combat.start(\''+boss.id+'\',true)">挑战 BOSS</button>'}
+    </div>`;
+
+    html += `<div class="row" style="margin-top:6px;">
+      <button class="btn sm" onclick="UI.openFloor()">切换楼层</button>
+      <button class="btn sm ghost" onclick="UI.openArea()">切换地图</button>
+    </div></div>`;
+    box.innerHTML = html;
+  }
+};
+
+/* ============================================================
+ *  弹窗 UI 层
+ * ============================================================ */
+const UI = {
+  open(html){
+    $('sheet').innerHTML = html;
+    $('overlay').classList.remove('hidden');
+  },
+  close(){ $('overlay').classList.add('hidden'); },
+
+  /* --- 地图选择 --- */
+  openArea(){
+    let html = `<h3>选择区域</h3>`;
+    AREAS.forEach(ar=>{
+      const locked = !ar.unlock && !(ar.id==='dragonCity' && Game.flags.dragonCity);
+      if(locked) return;
+      html += `<button class="btn" onclick="UI.pickArea('${ar.id}')">${ar.name}</button>`;
+    });
+    html += `<div class="close-row"><button class="btn ghost" onclick="UI.close()">关闭</button></div>`;
+    this.open(html);
+  },
+  pickArea(id){
+    Game.ui.areaId = id;
+    Game.ui.floorIdx = 0;
+    this.openFloor();
+  },
+
+  /* --- 楼层列表 --- */
+  openFloor(){
+    const ar = AREA_MAP[Game.ui.areaId];
+    const st = areaState(ar.id);
+    let html = `<h3>${ar.name} · 选择楼层</h3>`;
+    ar.floors.forEach((f, i)=>{
+      tickRespawn(ar.id, i);
+      const s = st.floors[i];
+      html += `<button class="btn" onclick="UI.enterFloor(${i})">
+        第${i+1}层 ${s.mark?'✔':'✘'} <span class="dim">| ${f.monsters[0].name} / ${f.boss.name}</span>
+      </button>`;
+    });
+    html += `<div class="close-row"><button class="btn ghost" onclick="UI.close()">关闭</button></div>`;
+    this.open(html);
+  },
+  enterFloor(i){
+    // 印记软锁：如果上一层未点亮，弹确认
+    if(i > 0){
+      const prev = areaState(Game.ui.areaId).floors[i-1];
+      if(!prev.mark){
+        confirmBox(`上一层（第${i}层）印记未点亮，进入后可能危险。是否继续？`, ()=>{
+          Game.ui.floorIdx = i; Quest.onReachFloor(Game.ui.areaId, i);
+          Render.top(); Render.main(); UI.close();
+        });
+        return;
+      }
+    }
+    Game.ui.floorIdx = i;
+    Quest.onReachFloor(Game.ui.areaId, i);
+    Render.top(); Render.main();
+    UI.close();
+    Save.auto();
+  },
+
+  /* --- 人物穿戴 --- */
+  openWorn(){
+    let html = `<h3>人物穿戴</h3>`;
+    const order = ['weapon','helmet','cloth','shoe','belt','ring','neck'];
+    order.forEach(s=>{
+      const e = Game.worn[s];
+      if(e){
+        const t = equipStat(e), q = QUALITY[e.quality];
+        html += `<div class="panel" style="margin:6px 0;">
+          <div class="${q.cls}">${e.name} <span class="dim">[${q.name}] ${SLOT_NAME[s]}</span></div>
+          <div class="dim" style="font-size:12px;">攻 ${t.atk} · 防 ${t.def} · HP+${t.hp} · 洗练 ${e.refineTimes}/3</div>
+          <div class="row" style="margin-top:6px;">
+            <button class="btn sm" onclick="Equip.unwear('${s}')">卸下</button>
+          </div>
+        </div>`;
+      }else{
+        html += `<div class="panel" style="margin:6px 0;"><div class="dim">${SLOT_NAME[s]}：空</div></div>`;
+      }
+    });
+    html += `<div class="close-row">
+      <button class="btn" onclick="Equip.autoBest()">一键最强</button>
+      <button class="btn ghost" onclick="UI.close()">关闭</button>
+    </div>`;
+    this.open(html);
+  },
+
+  /* --- 背包 --- */
+  openBag(){
+    const p = Game.player;
+    let html = `<h3>背包 <span class="dim">(${Game.bag.length}/${p.bagMax})</span></h3>`;
+    if(Game.bag.length === 0) html += `<div class="dim">空空如也</div>`;
+    Game.bag.forEach((e, i)=>{
+      const t = equipStat(e), q = QUALITY[e.quality];
+      const wornEq = Game.worn[e.slot];
+      let cmp = '';
+      if(wornEq){
+        const wt = equipStat(wornEq);
+        const dA = t.atk - wt.atk, dD = t.def - wt.def;
+        if(dA || dD) cmp = `<span class="dim">（对比: 攻${dA>=0?'+':''}${dA} 防${dD>=0?'+':''}${dD}）</span>`;
+      }else{
+        cmp = `<span class="dim">（${SLOT_NAME[e.slot]}空）</span>`;
+      }
+      html += `<div class="panel" style="margin:6px 0;">
+        <div class="${q.cls}">${e.name} <span class="dim">[${q.name}]</span></div>
+        <div class="dim" style="font-size:12px;">攻 ${t.atk} · 防 ${t.def} · HP+${t.hp} · 洗练 ${e.refineTimes}/3 ${cmp}</div>
+        <div class="row" style="margin-top:6px;">
+          <button class="btn sm" onclick="Equip.wear(${i})">穿戴</button>
+          <button class="btn sm" onclick="UI.openRefine(${i})">洗练</button>
+          <button class="btn sm" onclick="Equip.sell(${i})">出售(${EQUIP_BASE[e.name].sell})</button>
+          <button class="btn sm" onclick="Equip.decompose(${i})">分解</button>
+        </div>
+      </div>`;
+    });
+    html += `<div class="close-row"><button class="btn ghost" onclick="UI.close()">关闭</button></div>`;
+    this.open(html);
+  },
+
+  /* --- 洗练 --- */
+  openRefine(idx){
+    const e = Game.bag[idx];
+    if(!e) return;
+    const t = equipStat(e), q = QUALITY[e.quality];
+    const risk = Equip.refineRisk(e);
+    let html = `<h3>装备洗练</h3>
+      <div class="panel">
+        <div class="${q.cls}">${e.name} [${q.name}]</div>
+        <div class="dim" style="font-size:12px;">当前 攻 ${t.atk} · 防 ${t.def} · HP+${t.hp}</div>
+        <div class="dim" style="font-size:12px;">洗练次数 ${e.refineTimes}/3 · 持有材料 ${Game.mat}</div>
+        <div class="dim" style="font-size:12px;">本次风险：${(risk*100).toFixed(1)}% 破损</div>
+        <div class="row" style="margin-top:8px;">
+          <button class="btn primary" onclick="Equip.refine(${idx})">执行洗练（消耗1材料）</button>
+        </div>
+      </div>
+      <div class="close-row"><button class="btn ghost" onclick="UI.openBag()">返回背包</button></div>`;
+    this.open(html);
+  },
+
+  /* --- 商店 --- */
+  openShop(){
+    let html = `<h3>商店</h3>`;
+    html += `<div class="panel">
+      <div>红药 ×1 <span class="dim">${POTION_PRICE} 金币</span></div>
+      <div class="row" style="margin-top:6px;">
+        <button class="btn sm" onclick="Shop.buyPotion(1)">买1瓶</button>
+        <button class="btn sm" onclick="Shop.buyPotion(10)">买10瓶</button>
+        <button class="btn sm" onclick="Shop.buyPotion(50)">买50瓶</button>
+      </div>
+    </div>`;
+    SHOP_LIST.forEach(name=>{
+      const b = EQUIP_BASE[name];
+      html += `<div class="panel" style="margin:6px 0;">
+        <div>${name} <span class="dim">[${SLOT_NAME[b.slot]}]</span></div>
+        <div class="dim" style="font-size:12px;">基础 攻 ${b.atk} · 防 ${b.def} · 售价 ${b.buy} 金币</div>
+        <button class="btn sm" style="margin-top:6px;" onclick="Shop.buyEquip('${name}')">购买（普通品质）</button>
+      </div>`;
+    });
+    html += `<div class="close-row"><button class="btn ghost" onclick="UI.close()">关闭</button></div>`;
+    this.open(html);
+  },
+
+  /* --- 任务 --- */
+  openQuest(){
+    Quest.refreshPool(false);
+    let html = `<h3>任务面板</h3>
+      <div class="panel">
+        <div>已接任务 <b>${Game.quest.doing.length}</b>/3</div>
+      </div>`;
+    html += `<h4 style="color:var(--tx2);margin:8px 0 4px;">进行中</h4>`;
+    if(Game.quest.doing.length === 0) html += `<div class="dim">暂无</div>`;
+    Game.quest.doing.forEach((q, i)=>{
+      const desc = Quest.desc(q);
+      const canPay = q.type==='payGold' && !q.finished && Game.player.gold >= q.needCount*100;
+      html += `<div class="panel" style="margin:6px 0; ${q.finished?'opacity:.6':''}">
+        <div>${desc}</div>
+        <div class="dim" style="font-size:12px;">奖励 ${q.goldReward} 金币 · ${q.expReward} 经验</div>
+        <div class="row" style="margin-top:6px;">
+          ${q.finished?`<button class="btn sm" onclick="Quest.claim(${i})">领取奖励</button>`:''}
+          ${q.type==='payGold' && !q.finished?`<button class="btn sm ${canPay?'':'ghost'}" onclick="Quest.payGold(${i})" ${canPay?'':'disabled'}>上交金币</button>`:''}
+          <button class="btn sm ghost" onclick="Quest.abandon(${i})">放弃</button>
+        </div>
+      </div>`;
+    });
+
+    const cd = Quest.cdLeft();
+    html += `<h4 style="color:var(--tx2);margin:10px 0 4px;">可接任务 <span class="dim">(下次刷新 ${cd}s)</span></h4>`;
+    if(Game.quest.avail.length === 0) html += `<div class="dim">暂无可接任务</div>`;
+    Game.quest.avail.forEach((q, i)=>{
+      html += `<div class="panel" style="margin:6px 0;">
+        <div>${Quest.desc(q)}</div>
+        <div class="dim" style="font-size:12px;">奖励 ${q.goldReward} 金币 · ${q.expReward} 经验</div>
+        <button class="btn sm" style="margin-top:6px;" onclick="Quest.accept(${i})">接取</button>
+      </div>`;
+    });
+    html += `<div class="close-row"><button class="btn ghost" onclick="UI.close()">关闭</button></div>`;
+    this.open(html);
+
+    // 每秒刷新倒计时（只更新文字，不重建 DOM）
+    clearInterval(this._questTimer);
+    this._questTimer = setInterval(()=>{
+      if($('overlay').classList.contains('hidden')){ clearInterval(this._questTimer); return; }
+      const node = document.querySelector('#sheet h4 .dim');
+      if(node) node.textContent = `(下次刷新 ${Quest.cdLeft()}s)`;
+    }, 1000);
+  }
+};
+
+/* ============================================================
+ *  装备 / 背包 / 洗练
+ * ============================================================ */
+const Equip = {
+  wear(idx){
+    const e = Game.bag[idx]; if(!e) return;
+    const old = Game.worn[e.slot];
+    Game.worn[e.slot] = e;
+    Game.bag.splice(idx, 1);
+    if(old) Game.bag.push(old);
+    Quest.onWear(e.name);
+    Save.auto();
+    UI.openBag(); Render.top();
+  },
+  unwear(slot){
+    const e = Game.worn[slot]; if(!e) return;
+    if(Game.bag.length >= Game.player.bagMax) return toast("背包已满");
+    Game.bag.push(e); Game.worn[slot] = null;
+    Save.auto();
+    UI.openWorn(); Render.top();
+  },
+  sell(idx){
+    const e = Game.bag[idx]; if(!e) return;
+    const price = EQUIP_BASE[e.name].sell * (1 + QUALITY[e.quality].rate*2 | 0);
+    Game.player.gold += Math.floor(price);
+    Game.bag.splice(idx, 1);
+    toast("出售 +" + Math.floor(price) + " 金币");
+    Save.auto();
+    UI.openBag(); Render.top();
+  },
+  decompose(idx){
+    const e = Game.bag[idx]; if(!e) return;
+    Game.mat += DECOMP_MAT[e.quality];
+    Game.bag.splice(idx, 1);
+    toast("分解 +" + DECOMP_MAT[e.quality] + " 材料");
+    Save.auto();
+    UI.openBag(); Render.top();
+  },
+  autoBest(){
+    const order = ['weapon','helmet','cloth','shoe','belt','ring','neck'];
+    // 先把所有佩戴中的卸到临时池
+    const pool = Game.bag.slice();
+    order.forEach(s=>{ if(Game.worn[s]) pool.push(Game.worn[s]); });
+    // 每个槽位选评分最高的
+    order.forEach(s=>{
+      const cands = pool.filter(e=>e.slot===s);
+      if(cands.length === 0){ Game.worn[s] = null; return; }
+      cands.sort((a,b)=>{
+        const ta = equipStat(a), tb = equipStat(b);
+        return (tb.atk+tb.def+tb.hp*0.3) - (ta.atk+ta.def+ta.hp*0.3);
+      });
+      Game.worn[s] = cands[0];
+    });
+    // 剩余进背包
+    const used = new Set(order.map(s=>Game.worn[s]).filter(Boolean).map(e=>e.uid));
+    Game.bag = pool.filter(e=>!used.has(e.uid));
+    // 如果背包超上限（极少数情况）踢掉多余
+    while(Game.bag.length > Game.player.bagMax) Game.bag.pop();
+    Save.auto();
+    UI.openWorn(); Render.top();
+    toast("已装备最强");
+  },
+  refineRisk(e){
+    let risk = 0.12 + (e.refineAtk+e.refineDef+e.refineHp) * 0.004;
+    return clamp(risk, 0, 0.9);
+  },
+  refine(idx){
+    const e = Game.bag[idx]; if(!e) return;
+    if(e.refineTimes >= 3) return toast("已达洗练上限");
+    if(Game.mat < 1) return toast("缺少洗练材料");
+    const risk = this.refineRisk(e);
+    Game.mat -= 1;
+    if(Math.random() < risk){
+      e.refineAtk = 0; e.refineDef = 0; e.refineHp = 0;
+      toast("💥 洗练破损，附加属性清零");
+    }else{
+      e.refineAtk += rnd(1,6);
+      e.refineDef += rnd(1,4);
+      if(Math.random() < 0.35) e.refineHp += rnd(2,12);
+      e.refineTimes++;
+      toast("洗练成功");
+    }
+    Save.auto();
+    UI.openRefine(idx); Render.top();
+  }
+};
+
+/* ============================================================
+ *  商店
+ * ============================================================ */
+const Shop = {
+  buyPotion(n){
+    const cost = n * POTION_PRICE;
+    if(Game.player.gold < cost) return toast("金币不足");
+    Game.player.gold -= cost;
+    Game.player.potion += n;
+    toast(`购得红药 ×${n}`);
+    Save.auto();
+    UI.openShop(); Render.top();
+  },
+  buyEquip(name){
+    const b = EQUIP_BASE[name];
+    if(Game.player.gold < b.buy) return toast("金币不足");
+    if(Game.bag.length >= Game.player.bagMax) return toast("背包已满");
+    Game.player.gold -= b.buy;
+    Game.bag.push(makeEquip(name, 'normal'));
+    toast("购买成功");
+    Save.auto();
+    UI.openShop(); Render.top();
+  }
+};
+
+/* ============================================================
+ *  任务系统
+ * ============================================================ */
+const Quest = {
+  refreshPool(force){
+    const now = Date.now();
+    if(!force && now - Game.quest.refreshTs < QUEST_POOL_CD) return;
+    Game.quest.refreshTs = now;
+    Game.quest.avail = [];
+    for(let i=0;i<5;i++) Game.quest.avail.push(this.gen());
+  },
+  cdLeft(){
+    return Math.max(0, Math.ceil((Game.quest.refreshTs + QUEST_POOL_CD - Date.now()) / 1000));
+  },
+  gen(){
+    const types = ['killMonster','collectItem','reachFloor','payGold','wearEquip'];
+    const t = types[rnd(0, types.length-1)];
+    const ar = AREAS[rnd(0, AREAS.length-1)];
+    const fi = rnd(0, 2);
+    const def = ar.floors[fi];
+    const mon = def.monsters[rnd(0, def.monsters.length-1)];
+    const eqNames = Object.keys(EQUIP_BASE);
+    const eqName = eqNames[rnd(0, eqNames.length-1)];
+    const q = {
+      qid: uid(), type: t,
+      targetId: mon.id, targetName: mon.name,
+      areaId: ar.id, floorIdx: fi,
+      equipName: eqName,
+      needCount: rnd(2, 5),
+      progress: 0, finished: false,
+      goldReward: rnd(200, 600),
+      expReward: rnd(300, 900)
+    };
+    if(t === 'reachFloor'){ q.needCount = 1; }
+    if(t === 'wearEquip'){ q.needCount = 1; }
+    if(t === 'payGold'){ q.needCount = rnd(2, 5); }
+    return q;
+  },
+  desc(q){
+    switch(q.type){
+      case 'killMonster': return `击杀 ${q.needCount} 只「${q.targetName}」 (${q.progress}/${q.needCount})`;
+      case 'collectItem': return `收集 ${q.needCount} 件「${q.equipName}」 (${q.progress}/${q.needCount})`;
+      case 'reachFloor':  return `到达【${AREA_MAP[q.areaId].name}】第 ${q.floorIdx+1} 层 ${q.finished?'✔':''}`;
+      case 'payGold':     return `上交 ${q.needCount*100} 金币 ${q.finished?'✔':''}`;
+      case 'wearEquip':   return `穿戴装备「${q.equipName}」 ${q.finished?'✔':''}`;
+    }
+    return '';
+  },
+  accept(i){
+    if(Game.quest.doing.length >= 3) return toast("最多同时接 3 个任务");
+    const q = Game.quest.avail.splice(i, 1)[0];
+    Game.quest.doing.push(q);
+    // 立即检查一次性条件
+    if(q.type === 'reachFloor' && Game.ui.areaId === q.areaId && Game.ui.floorIdx === q.floorIdx){
+      q.finished = true;
+    }
+    if(q.type === 'collectItem') this.recheckCollect(q);
+    if(q.type === 'wearEquip'){
+      for(const s in Game.worn){
+        if(Game.worn[s] && Game.worn[s].name === q.equipName){ q.finished = true; break; }
+      }
+    }
+    Save.auto();
+    UI.openQuest();
+  },
+  abandon(i){
+    confirmBox("确定放弃该任务？", ()=>{
+      Game.quest.doing.splice(i, 1);
+      Save.auto();
+      UI.openQuest();
+    });
+  },
+  claim(i){
+    const q = Game.quest.doing[i]; if(!q || !q.finished) return;
+    Game.player.gold += q.goldReward;
+    addExp(q.expReward);
+    Game.quest.doing.splice(i, 1);
+    toast(`任务完成 +${q.goldReward} 金币`);
+    Save.auto();
+    UI.openQuest(); Render.top();
+  },
+  payGold(i){
+    const q = Game.quest.doing[i]; if(!q) return;
+    const cost = q.needCount * 100;
+    if(Game.player.gold < cost) return toast("金币不足");
+    Game.player.gold -= cost;
+    q.finished = true;
+    Save.auto();
+    UI.openQuest(); Render.top();
+  },
+
+  /* ---- 事件钩子 ---- */
+  onKill(monId){
+    let changed = false;
+    Game.quest.doing.forEach(q=>{
+      if(q.type === 'killMonster' && q.targetId === monId && !q.finished){
+        q.progress++;
+        if(q.progress >= q.needCount) q.finished = true;
+        changed = true;
+      }
+    });
+    if(changed){ Save.auto(); }
+  },
+  onReachFloor(areaId, fi){
+    let changed = false;
+    Game.quest.doing.forEach(q=>{
+      if(q.type === 'reachFloor' && q.areaId === areaId && q.floorIdx === fi && !q.finished){
+        q.finished = true; changed = true;
+      }
+    });
+    if(changed){ Save.auto(); }
+  },
+  onWear(eqName){
+    let changed = false;
+    Game.quest.doing.forEach(q=>{
+      if(q.type === 'wearEquip' && q.equipName === eqName && !q.finished){
+        q.finished = true; changed = true;
+      }
+    });
+    if(changed){ Save.auto(); }
+  },
+  onBagChange(){
+    // 收集任务：每次获得/失去装备后重算
+    let changed = false;
+    Game.quest.doing.forEach(q=>{
+      if(q.type === 'collectItem'){
+        const before = q.progress;
+        this.recheckCollect(q);
+        if(q.progress !== before) changed = true;
+      }
+    });
+    if(changed){ Save.auto(); }
+  },
+  recheckCollect(q){
+    let n = 0;
+    Game.bag.forEach(e=>{ if(e.name === q.equipName) n++; });
+    for(const s in Game.worn){ if(Game.worn[s] && Game.worn[s].name === q.equipName) n++; }
+    q.progress = Math.min(n, q.needCount);
+    if(q.progress >= q.needCount) q.finished = true;
+  }
+};
+
+/* ============================================================
+ *  战斗系统（半即时）
+ * ============================================================ */
+const Combat = {
+  start(monId, isBoss){
+    const ar = AREA_MAP[Game.ui.areaId];
+    const fi = Game.ui.floorIdx;
+    const def = ar.floors[fi];
+    const src = isBoss ? def.boss : def.monsters.find(m=>m.id === monId);
+    if(!src) return;
+
+    // 深拷贝成战斗实例
+    const inst = {
+      id: src.id, name: src.name,
+      hp: src.hp, maxHp: src.hp,
+      atk: src.atk, def: src.def, exp: src.exp,
+      gMin: src.gMin, gMax: src.gMax,
+      isBoss, dropEquip: src.dropEquip || null,
+      unlockDragon: src.unlockDragon || false
+    };
+    Game.battle = {
+      mon: inst, cd: 0, auto: false, timer: null, token: 0
+    };
+    $('battle').classList.remove('hidden');
+    $('bLoc').textContent = `${ar.name} · 第${fi+1}层 ${isBoss?'· BOSS':''}`;
+    $('bMonName').textContent = inst.name;
+    $('bMonAvatar').textContent = isBoss ? '👹' : '🐾';
+    $('bLog').innerHTML = '';
+    this.log('sys', `遭遇 ${inst.name}！`);
+    this.render();
+
+    // 第一次进入不自动打，等玩家点。
+  },
+
+  render(){
+    const b = Game.battle; if(!b) return;
+    const m = b.mon;
+    $('bMonHpBar').style.width = clamp(m.hp/m.maxHp,0,1)*100 + '%';
+    $('bMonHpTxt').textContent = Math.floor(m.hp) + '/' + m.maxHp;
+
+    const mHp = playerMaxHp();
+    $('bMeHpBar').style.width = clamp(Game.player.hp/mHp,0,1)*100 + '%';
+    $('bMeHpTxt').textContent = Math.floor(Game.player.hp) + '/' + mHp;
+    $('bPotTip').textContent = `红药 ${Game.player.potion}`;
+
+    $('bSkillBtn').textContent = b.cd > 0 ? `烈火剑法(${b.cd})` : '烈火剑法';
+    $('bSkillBtn').disabled = b.cd > 0;
+    $('bAutoBtn').textContent = b.auto ? '停止自动' : '自动战斗';
+    $('bTip').textContent = b.auto ? '自动战斗中…' : '点击「攻击」= 双方各打一下';
+  },
+
+  log(kind, text){
+    const c = $('bLog');
+    const cls = { me:'l-me', mon:'l-mon', sys:'l-sys', good:'l-good', bad:'l-bad' }[kind] || 'l-sys';
+    const div = document.createElement('div');
+    div.className = cls;
+    div.textContent = text;
+    c.appendChild(div);
+    c.scrollTop = c.scrollHeight;
+    // 只保留最近 60 行
+    while(c.children.length > 60) c.removeChild(c.firstChild);
+  },
+
+  /* ---- 半即时：一次攻击 = 玩家先手 + 怪物反击 ---- */
+  attack(){
+    const b = Game.battle; if(!b || b.mon.hp <= 0) return;
+    this.playerHit(1.0);
+    if(b.mon.hp > 0) this.monsterHit();
+    this.afterRound();
+  },
+  skill(){
+    const b = Game.battle; if(!b || b.mon.hp <= 0) return;
+    if(b.cd > 0) return;
+    this.playerHit(1.8, true);
+    b.cd = SKILL_CD_TURNS;
+    if(b.mon.hp > 0) this.monsterHit();
+    this.afterRound();
+  },
+  potion(){
+    const b = Game.battle; if(!b) return;
+    if(Game.player.potion <= 0) return toast("没有红药");
+    Game.player.potion--;
+    const mHp = playerMaxHp();
+    const heal = Math.floor(mHp * 0.35);
+    Game.player.hp = Math.min(mHp, Game.player.hp + heal);
+    this.log('good', `喝红药恢复 ${heal} HP`);
+    // 喝药不消耗回合，但给怪物一次攻击
+    if(b.mon.hp > 0) this.monsterHit();
+    this.afterRound();
+  },
+
+  playerHit(mul, isSkill){
+    const b = Game.battle; if(!b) return;
+    const a = calcAttr();
+    let dmg = Math.max(1, a.atk - b.mon.def);
+    if(isSkill) dmg = Math.floor(dmg * mul);
+    let crit = false;
+    if(Math.random() < 0.12){ dmg = Math.floor(dmg * 1.3); crit = true; }
+    b.mon.hp -= dmg;
+    this.log('me', `你${isSkill?'使用烈火剑法':''}造成 ${dmg} 伤害${crit?'（暴击）':''}`);
+  },
+  monsterHit(){
+    const b = Game.battle; if(!b) return;
+    const a = calcAttr();
+    let dmg = Math.max(1, b.mon.atk - a.def);
+    let crit = false;
+    if(Math.random() < 0.08){ dmg = Math.floor(dmg * 1.25); crit = true; }
+    Game.player.hp -= dmg;
+    this.log('mon', `${b.mon.name} 对你造成 ${dmg} 伤害${crit?'（暴击）':''}`);
+  },
+
+  afterRound(){
+    const b = Game.battle; if(!b) return;
+    if(b.cd > 0) b.cd--;
+    this.render();
+
+    if(b.mon.hp <= 0){ this.onMonDead(); return; }
+    if(Game.player.hp <= 0){ this.onPlayerDead(); return; }
+
+    // 自动战斗：如果血量过低且开启自动喝药
+    if(b.auto && Game.player.potion > 0){
+      const mHp = playerMaxHp();
+      if(Game.player.hp / mHp < AUTO_POTION_THRESHOLD){
+        // 下一拍自动喝
+        setTimeout(()=>{ if(Game.battle) this.potion(); }, 150);
+      }
+    }
+  },
+
+  onMonDead(){
+    const b = Game.battle;
+    const m = b.mon;
+    this.log('good', `✅ 击杀 ${m.name}`);
+    Game.stats.kills++;
+
+    // 记录死亡时间
+    const ar = AREA_MAP[Game.ui.areaId];
+    const fi = Game.ui.floorIdx;
+    const st = areaState(Game.ui.areaId).floors[fi];
+    if(m.isBoss){
+      st.bossDeath = Date.now();
+      if(m.unlockDragon){ Game.flags.dragonCity = true; this.log('good', '🌐 魔龙城已解锁！'); }
+    }else{
+      st.monDeath[m.id] = Date.now();
+      if(!st.mark){
+        st.mark = true;
+        this.log('good', '🔓 本层印记已点亮');
+      }
+    }
+
+    // 金币
+    const gold = rnd(m.gMin, m.gMax);
+    Game.player.gold += gold;
+    this.log('good', `获得 ${gold} 金币`);
+
+    // 掉落
+    if(Math.random() < 0.28){
+      const pool = ["木剑","铁剑","布帽","布衣","青铜戒指","木项链"];
+      if(m.dropEquip) pool.push(...m.dropEquip);
+      const name = pool[rnd(0, pool.length-1)];
+      if(Game.bag.length < Game.player.bagMax){
+        const eq = makeEquip(name);
+        Game.bag.push(eq);
+        const q = QUALITY[eq.quality];
+        this.log('good', `✨ 爆出【${eq.name} · ${q.name}】`);
+        Quest.onBagChange();
+      }else{
+        this.log('bad', '背包已满，装备丢失');
+      }
+    }
+
+    // 经验
+    addExp(m.exp);
+    // 任务
+    Quest.onKill(m.id);
+
+    // 结算收尾
+    this.stopAuto();
+    Save.auto();
+    setTimeout(()=>{ this.end(); }, 700);
+  },
+
+  onPlayerDead(){
+    this.log('bad', '你死亡！损失 10% 金币');
+    Game.player.gold = Math.floor(Game.player.gold * 0.9);
+    Game.player.hp = playerMaxHp();
+    Game.stats.deaths++;
+    this.stopAuto();
+    Save.auto();
+    setTimeout(()=>{ this.end(); }, 900);
+  },
+
+  flee(){
+    const b = Game.battle; if(!b) return;
+    if(Math.random() < 0.45){
+      this.log('sys', '逃跑成功！');
+      this.stopAuto();
+      setTimeout(()=>this.end(), 300);
+    }else{
+      this.log('bad', '逃跑失败！');
+      this.monsterHit();
+      this.afterRound();
+    }
+  },
+
+  toggleAuto(){
+    const b = Game.battle; if(!b) return;
+    b.auto = !b.auto;
+    this.render();
+    if(b.auto) this.autoTick();
+  },
+  autoTick(){
+    const b = Game.battle; if(!b || !b.auto) return;
+    clearTimeout(b.timer);
+    b.timer = setTimeout(()=>{
+      if(!Game.battle || !Game.battle.auto) return;
+      if(Game.battle.mon.hp <= 0) return;
+      // 自动优先喝药
+      const mHp = playerMaxHp();
+      if(Game.player.potion > 0 && Game.player.hp / mHp < AUTO_POTION_THRESHOLD){
+        this.potion();
+      }else if(Game.battle.cd === 0){
+        this.skill();
+      }else{
+        this.attack();
+      }
+      if(Game.battle && Game.battle.auto) this.autoTick();
+    }, 420);
+  },
+  stopAuto(){
+    const b = Game.battle;
+    if(b){ b.auto = false; clearTimeout(b.timer); }
+  },
+
+  quit(){
+    if(Game.battle && Game.battle.mon.hp > 0){
+      confirmBox("战斗尚未结束，确定退出？（视为逃跑失败）", ()=>{
+        this.stopAuto();
+        this.end();
+      });
+    }else{
+      this.stopAuto();
+      this.end();
+    }
+  },
+  end(){
+    this.stopAuto();
+    Game.battle = null;
+    $('battle').classList.add('hidden');
+    Render.top();
+    Render.main();
+  }
+};
+
+/* ============================================================
+ *  启动
+ * ============================================================ */
+initGame();
+Render.top();
+Render.main();
+</script>
+</body>
+</html>
