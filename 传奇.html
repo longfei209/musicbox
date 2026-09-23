@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>仿传奇｜分层地图 印记解锁下一层</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:#111;color:#eee;padding:8px;font-size:14px;line-height:1.4;max-width:700px;margin:0 auto;padding-bottom:340px;}
+.box{border:1px solid #444;padding:10px;margin:6px 0;border-radius:6px;background:#1a1a1a;}
+.btn{padding:10px;margin:3px 0;font-size:14px;background:#b8860b;color:#000;border:none;border-radius:4px;}
+.btn:disabled{background:#444;color:#888;}
+.btn-danger{background:#8b0000;color:#fff;}
+.btn-blue{background:#1e90ff;color:#fff;}
+.btn-green{background:#228b22;color:#fff;}
+.flex-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+.equip-slot{width:70px;height:70px;border:1px solid #555;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:11px;text-align:center;background:#222;}
+.popup{position:fixed;left:0;right:0;bottom:0;background:#171717;border-top:2px solid #666;padding:12px;max-height:320px;overflow-y:auto;z-index:99;}
+.hidden{display:none !important;}
+.quality-white{color:#ffffff;}
+.quality-green{color:#32cd32;}
+.quality-blue{color:#4169e1;}
+.quality-gold{color:#ffd700;}
+.log-text{font-size:13px;max-height:120px;overflow:auto;background:#0c0c0c;padding:6px;border-radius:4px;margin:4px 0;}
+</style>
+</head>
+<body>
+<div class="box">
+  <h3>角色状态</h3>
+  <div>等级:<span id="plyLv">1</span> 经验:<span id="plyExp">0</span></div>
+  <div>生命:<span id="plyHp">100</span> / <span id="plyMaxHp">100</span></div>
+  <div>攻击:<span id="plyAtk">10</span> 防御:<span id="plyDef">5</span></div>
+  <div>金币:<span id="plyGold">100</span></div>
+  <div>洗练材料:<span id="matCount">0</span></div>
+  <div class="flex-row">
+    <button class="btn" onclick="openEquipUi()">人物装备</button>
+    <button class="btn" onclick="openBag()">背包</button>
+    <button class="btn" onclick="openShop()">商店</button>
+    <button class="btn" onclick="openQuestPanel()">任务</button>
+  </div>
+  <div class="flex-row">
+    <button class="btn btn-blue" onclick="openAreaSelect()">选择地图</button>
+    <button class="btn btn-danger" onclick="gameSave()">存档</button>
+    <button class="btn btn-danger" onclick="gameLoad()">读档</button>
+    <button class="btn btn-danger" onclick="gameReset()">重置游戏</button>
+  </div>
+</div>
+
+<!-- 地图选择弹窗 -->
+<div id="popupArea" class="popup hidden">
+  <h3>选择区域</h3>
+  <div id="areaList"></div>
+  <button class="btn" onclick="closeAllPopup()">关闭</button>
+</div>
+
+<!--楼层弹窗-->
+<div id="popupFloor" class="popup hidden">
+  <h3 id="floorTitle"></h3>
+  <div>印记状态：<span id="markTip">未解锁</span></div>
+  <div id="monsterList"></div>
+  <button class="btn" onclick="closeAllPopup()">关闭</button>
+</div>
+
+<!--战斗弹窗 提示放在按钮上方-->
+<div id="popupBattle" class="popup hidden">
+  <h3>战斗</h3>
+  <div>怪物：<span id="battleMonName"></span> HP:<span id="battleMonHp"></span>/<span id="battleMonMaxHp"></span></div>
+  <div>我方HP:<span id="battlePlayerHp"></span>/<span id="battlePlayerMaxHp"></span></div>
+  <div class="log-text" id="battleLog"></div>
+  <!--提示放在按键上方-->
+  <div id="battleTip" style="margin:6px 0;color:#ffa500;"></div>
+  <div class="flex-row">
+    <button class="btn" id="btnAtk" onclick="battleAttack()">攻击</button>
+    <button class="btn" id="btnSkill" onclick="battleSkill()">烈火剑法</button>
+    <button class="btn btn-green" onclick="battleUsePotion()">喝红药</button>
+    <button class="btn btn-danger" onclick="battleFlee()">逃跑</button>
+    <button class="btn btn-blue" id="btnAuto" onclick="toggleAutoBattle()">自动战斗</button>
+    <button class="btn" onclick="exitBattle()">退出战斗</button>
+  </div>
+</div>
+
+<!--装备面板弹窗-->
+<div id="popupEquip" class="popup hidden">
+  <h3>人物穿戴</h3>
+  <div class="flex-row">
+    <div class="equip-slot" id="slot-weapon">武器</div>
+    <div class="equip-slot" id="slot-helmet">帽子</div>
+    <div class="equip-slot" id="slot-cloth">衣服</div>
+  </div>
+  <div class="flex-row">
+    <div class="equip-slot" id="slot-shoe">鞋子</div>
+    <div class="equip-slot" id="slot-belt">腰带</div>
+    <div class="equip-slot" id="slot-ring">戒指</div>
+    <div class="equip-slot" id="slot-neck">项链</div>
+  </div>
+  <div class="flex-row" style="margin-top:8px;">
+    <button class="btn" onclick="refreshEquipUi()">刷新</button>
+  </div>
+  <button class="btn" onclick="closeAllPopup()">关闭</button>
+</div>
+
+<!--背包弹窗（带分解）-->
+<div id="popupBag" class="popup hidden">
+  <h3>背包 <span id="bagSizeTip"></span></h3>
+  <div id="bagList"></div>
+  <div class="box">
+    <h4>装备分解</h4>
+    <div id="decomposeList"></div>
+  </div>
+  <button class="btn" onclick="closeAllPopup()">关闭</button>
+</div>
+
+<!--商店弹窗-->
+<div id="popupShop" class="popup hidden">
+  <h3>商店</h3>
+  <div id="shopList"></div>
+  <button class="btn" onclick="closeAllPopup()">关闭</button>
+</div>
+
+<!--洗练弹窗-->
+<div id="popupRefine" class="popup hidden">
+  <h3>装备洗练</h3>
+  <div id="refineInfo"></div>
+  <div class="flex-row">
+    <button class="btn btn-blue" onclick="doRefine()">执行洗练</button>
+    <button class="btn" onclick="closeAllPopup()">关闭</button>
+  </div>
+</div>
+
+<!--任务弹窗-->
+<div id="popupQuest" class="popup hidden">
+  <h3>任务面板</h3>
+  <div>已接任务(<span id="doingQuestCnt">0</span>/3)</div>
+  <div id="doingQuestBox"></div>
+  <div style="margin-top:10px;">可接任务(下次刷新:<span id="questCdTip">0</span>秒)</div>
+  <div id="availQuestBox"></div>
+  <button class="btn" onclick="closeAllPopup()">关闭</button>
+</div>
+
+<script>
+// ============ 配置常量 =============
+const QUALITY_CFG = {
+  normal:{name:"普通",cls:"quality-white",rate:0,text:"普通"},
+  good:{name:"优秀",cls:"quality-green",rate:0.15,text:"优秀"},
+  fine:{name:"精良",cls:"quality-blue",rate:0.30,text:"精良"},
+  epic:{name:"史诗",cls:"quality-gold",rate:0.55,text:"史诗"}
+};
+const DECOMPOSE_MAT = {normal:1,good:2,fine:4,epic:8};
+const AREAS_CFG = [
+  {
+    id:"grass",name:"新手草原",unlock:true,
+    floors:[
+      {monsters:[{id:"wolf",name:"野狼",hp:120,atk:12,def:4,exp:60,gMin:20,gMax:60,isBoss:false}],boss:{id:"wolfKing",name:"狼王",hp:350,atk:18,def:6,exp:180,gMin:80,gMax:160}},
+      {monsters:[{id:"boar",name:"野猪",hp:180,atk:16,def:6,exp:90,gMin:30,gMax:80,isBoss:false}],boss:{id:"boarKing",name:"野猪王",hp:450,atk:24,def:9,exp:240,gMin:100,gMax:200}},
+      {monsters:[{id:"hyena",name:"鬣狗",hp:240,atk:22,def:9,exp:130,gMin:40,gMax:100,isBoss:false}],boss:{id:"grassBoss",name:"草原霸主",hp:600,atk:30,def:12,exp:350,gMin:150,gMax:300}}
+    ]
+  },
+  {
+    id:"orc",name:"兽人古墓",unlock:true,
+    floors:[
+      {monsters:[{id:"orcSlave",name:"兽人奴隶",hp:320,atk:28,def:12,exp:180,gMin:60,gMax:140,isBoss:false}],boss:{id:"orcGuard",name:"兽人守卫长",hp:750,atk:38,def:16,exp:420,gMin:200,gMax:350}},
+      {monsters:[{id:"orcWar",name:"兽人战士",hp:420,atk:34,def:15,exp:240,gMin:80,gMax:180,isBoss:false}],boss:{id:"orcCaptain",name:"兽人队长",hp:900,atk:44,def:20,exp:520,gMin:240,gMax:420}},
+      {monsters:[{id:"orcSham",name:"兽人术士",hp:380,atk:42,def:13,exp:280,gMin:100,gMax:220,isBoss:false}],boss:{id:"orcKing",name:"兽人之王",hp:1200,atk:52,def:24,exp:700,gMin:320,gMax:550}}
+    ]
+  },
+  {
+    id:"pig",name:"猪洞",unlock:true,
+    floors:[
+      {monsters:[{id:"pigSoldier",name:"黑猪",hp:550,atk:40,def:18,exp:320,gMin:110,gMax:240,isBoss:false}],boss:{id:"pigBoss1",name:"红猪统领",hp:1300,atk:50,def:26,exp:780,gMin:340,gMax:600}},
+      {monsters:[{id:"pigAx",name:"白猪",hp:680,atk:48,def:22,exp:400,gMin:140,gMax:290,isBoss:false}],boss:{id:"pigBoss2",name:"白猪王",hp:1500,atk:58,def:30,exp:900,gMin:400,gMax:700}},
+      {monsters:[{id:"pigMag",name:"野猪法师",hp:620,atk:56,def:20,exp:460,gMin:170,gMax:340,isBoss:false}],boss:{id:"zhuDemon",name:"猪魔教主",hp:1800,atk:64,def:34,exp:1100,gMin:480,gMax:820}}
+    ]
+  },
+  {
+    id:"zuma",name:"祖玛神殿",unlock:true,
+    floors:[
+      {monsters:[{id:"zumaGuard",name:"祖玛卫士",hp:780,atk:54,def:28,exp:520,gMin:200,gMax:380,isBoss:false}],boss:{id:"zumaCap",name:"祖玛队长",hp:1700,atk:66,def:36,exp:1050,gMin:460,gMax:780}},
+      {monsters:[{id:"zumaArcher",name:"祖玛弓箭手",hp:700,atk:62,def:24,exp:580,gMin:230,gMax:420,isBoss:false}],boss:{id:"zumaPriest",name:"祖玛祭司",hp:1900,atk:72,def:38,exp:1200,gMin:520,gMax:880}},
+      {monsters:[{id:"zumaWar",name:"祖玛战将",hp:880,atk:68,def:32,exp:660,gMin:270,gMax:480,isBoss:false}],boss:{id:"zumaDemon",name:"祖玛教主",hp:2400,atk:80,def:44,exp:1450,gMin:620,gMax:1050,keyUnlockDragonCity:true}}
+    ]
+  },
+  {
+    id:"redMoon",name:"赤月巢穴",unlock:true,
+    floors:[
+      {monsters:[{id:"spider1",name:"月魔蜘蛛",hp:950,atk:70,def:34,exp:720,gMin:300,gMax:520,isBoss:false}],boss:{id:"spiderBoss1",name:"血魔",hp:2200,atk:84,def:42,exp:1350,gMin:600,gMax:980}},
+      {monsters:[{id:"spider2",name:"钢牙蜘蛛",hp:1100,atk:78,def:38,exp:820,gMin:340,gMax:580,isBoss:false}],boss:{id:"spiderBoss2",name:"金刚",hp:2500,atk:90,def:48,exp:1500,gMin:680,gMax:1100}},
+      {monsters:[{id:"spider3",name:"恶魔蜘蛛",hp:1250,atk:86,def:42,exp:920,gMin:380,gMax:640,isBoss:false}],boss:{id:"redMoonBoss",name:"赤月恶魔",hp:3000,atk:98,def:54,exp:1800,gMin:800,gMax:1300,unlockDragonCity:true}}
+    ]
+  },
+  {
+    id:"dragonCity",name:"魔龙城",unlock:false,
+    floors:[
+      {monsters:[{id:"dragonSoldier",name:"魔龙刀兵",hp:1100,atk:52,def:22,exp:1300,gMin:800,gMax:1300,isBoss:false}],boss:{id:"dragonMinBoss",name:"魔龙守卫",hp:2400,atk:64,def:28,exp:2600,gMin:1400,gMax:2200}},
+      {monsters:[{id:"dragonArcher",name:"魔龙弓箭手",hp:950,atk:56,def:20,exp:1200,gMin:750,gMax:1200,isBoss:false}],boss:{id:"dragonVice",name:"魔龙副将",hp:2700,atk:68,def:32,exp:2800,gMin:1500,gMax:2400}},
+      {monsters:[{id:"dragonKnight",name:"魔龙骑士",hp:1300,atk:60,def:26,exp:1450,gMin:900,gMax:1450,isBoss:false}],boss:{id:"dragonMaster",name:"魔龙教主",hp:2200,atk:70,def:30,exp:3000,gMin:1800,gMax:3000,dropEquip:["魔龙斩","魔龙项链"]}}
+    ]
+  }
+];
+const EQUIP_BASE = {
+  "木剑":{slot:"weapon",atk:8,def:0,buy:200,sell:80},
+  "铁剑":{slot:"weapon",atk:16,def:2,buy:600,sell:240},
+  "屠龙":{slot:"weapon",atk:38,def:8,buy:4500,sell:1800},
+  "魔龙斩":{slot:"weapon",atk:48,def:12,buy:6000,sell:3000},
+  "布帽":{slot:"helmet",atk:0,def:4,buy:120,sell:48},
+  "战神头盔":{slot:"helmet",atk:6,def:14,buy:2200,sell:880},
+  "布衣":{slot:"cloth",atk:0,def:6,buy:180,sell:72},
+  "战神铠甲":{slot:"cloth",atk:8,def:22,buy:3200,sell:1280},
+  "布鞋":{slot:"shoe",atk:0,def:3,buy:100,sell:40},
+  "战神战靴":{slot:"shoe",atk:4,def:12,buy:1800,sell:720},
+  "兽皮腰带":{slot:"belt",atk:0,def:4,buy:110,sell:44},
+  "战神腰带":{slot:"belt",atk:5,def:13,buy:2000,sell:800},
+  "青铜戒指":{slot:"ring",atk:4,def:2,buy:140,sell:56},
+  "力量戒指":{slot:"ring",atk:14,def:8,buy:2600,sell:1040},
+  "木项链":{slot:"neck",atk:3,def:2,buy:130,sell:52},
+  "魔龙项链":{slot:"neck",atk:18,def:14,buy:4800,sell:2400}
+};
+const SHOP_EQUIP_LIST = ["木剑","铁剑","布帽","战神头盔","布衣","战神铠甲","布鞋","战神战靴","兽皮腰带","战神腰带","青铜戒指","力量戒指","木项链"];
+
+// ==========全局状态==========
+let player = null;
+let bag = [];
+let equipWorn = {weapon:null,helmet:null,cloth:null,shoe:null,belt:null,ring:null,neck:null};
+let matCount = 0;
+let areaState = {};
+let currentAreaId = null;
+let currentFloorIdx = null;
+let battleTarget = null;
+let autoBattle = false;
+let skillCd = 0;
+let questDoing = [];
+let questAvailable = [];
+let questRefreshTs = 0;
+
+// 初始化玩家
+function initPlayer(){
+  player = {
+    lv:1,exp:0,hp:100,maxHp:100,baseAtk:10,baseDef:5,gold:100,potion:5,bagMax:20
+  };
+  bag = [];
+  equipWorn = {weapon:null,helmet:null,cloth:null,shoe:null,belt:null,ring:null,neck:null};
+  matCount = 0;
+  areaState = {};
+  currentAreaId=null;currentFloorIdx=null;
+  battleTarget=null;autoBattle=false;skillCd=0;
+  questDoing = []; questAvailable = []; questRefreshTs = Date.now();
+}
+
+// 创建装备实例
+function createEquipInstance(baseName,forceQuality=null){
+  const base = EQUIP_BASE[baseName];
+  let qk = "normal";
+  if(!forceQuality){
+    const r = Math.random();
+    if(r<0.08) qk="epic";
+    else if(r<0.22) qk="fine";
+    else if(r<0.45) qk="good";
+  }else qk=forceQuality;
+  const qcfg = QUALITY_CFG[qk];
+  const qRate = qcfg.rate;
+  return {
+    uid:Math.random().toString(36).slice(2),
+    name:baseName,
+    slot:base.slot,
+    baseAtk:base.atk,
+    baseDef:base.def,
+    qualityKey:qk,
+    refineTimes:0,
+    refineAtk:0,
+    refineDef:0,
+    refineHp:0,
+    sell:base.sell
+  }
+}
+
+// 获取装备总属性
+function getEquipTotal(eq){
+  const qr = QUALITY_CFG[eq.qualityKey].rate;
+  let atk = Math.floor((eq.baseAtk+eq.refineAtk)*(1+qr));
+  let def = Math.floor((eq.baseDef+eq.refineDef)*(1+qr));
+  let hp = eq.refineHp;
+  return {atk,def,hp};
+}
+
+//计算玩家总属性
+function calcPlayerAttr(){
+  let a = player.baseAtk;
+  let d = player.baseDef;
+  let addHp = 0;
+  for(let k in equipWorn){
+    const e = equipWorn[k];
+    if(!e) continue;
+    const t = getEquipTotal(e);
+    a += t.atk; d+=t.def; addHp += t.hp;
+  }
+  return {atk:a,def:d,addHp};
+}
+
+function refreshPlayerUi(){
+  document.getElementById("plyLv").innerText = player.lv;
+  document.getElementById("plyExp").innerText = player.exp;
+  const attr = calcPlayerAttr();
+  document.getElementById("plyHp").innerText = Math.floor(player.hp);
+  document.getElementById("plyMaxHp").innerText = player.maxHp + attr.addHp;
+  document.getElementById("plyAtk").innerText = attr.atk;
+  document.getElementById("plyDef").innerText = attr.def;
+  document.getElementById("plyGold").innerText = player.gold;
+  document.getElementById("matCount").innerText = matCount;
+}
+
+//等级提升
+function playerAddExp(val){
+  player.exp += val;
+  const need = player.lv*120;
+  if(player.exp >= need){
+    player.exp -= need;
+    player.lv +=1;
+    player.baseAtk +=4;
+    player.baseDef +=2;
+    player.maxHp +=25;
+    player.hp = player.maxHp;
+  }
+  refreshPlayerUi();
+}
+
+// =========地图状态处理=========
+function getAreaState(areaId){
+  if(!areaState[areaId]){
+    areaState[areaId] = {
+      floors:[],
+      dragonCityUnlocked:false
+    };
+    const areaDef = AREAS_CFG.find(x=>x.id===areaId);
+    for(let i=0;i<areaDef.floors.length;i++){
+      areaState[areaId].floors.push({
+        markDone:false,
+        monsterDeathTs:{},
+        bossDeathTs:null
+      })
+    }
+  }
+  return areaState[areaId];
+}
+
+//执行楼层复活判定
+function checkFloorResurrect(areaId,floorIdx){
+  const ast = getAreaState(areaId);
+  const fst = ast.floors[floorIdx];
+  const areaDef = AREAS_CFG.find(x=>x.id===areaId);
+  const floorDef = areaDef.floors[floorIdx];
+  const now = Date.now();
+  for(let m of floorDef.monsters){
+    const ts = fst.monsterDeathTs[m.id];
+    if(ts && (now - ts)>=30*1000){
+      delete fst.monsterDeathTs[m.id];
+    }
+  }
+  if(fst.bossDeathTs){
+    if((now - fst.bossDeathTs)>=120*1000){
+      fst.bossDeathTs = null;
+    }
+  }
+}
+
+//弹窗开关
+function closeAllPopup(){
+  document.querySelectorAll(".popup").forEach(el=>el.classList.add("hidden"));
+}
+function openAreaSelect(){
+  closeAllPopup();
+  document.getElementById("popupArea").classList.remove("hidden");
+  const box = document.getElementById("areaList");
+  box.innerHTML = "";
+  AREAS_CFG.forEach(ar=>{
+    if(!ar.unlock && !(ar.id==="dragonCity" && getAreaState("dragonCity").dragonCityUnlocked)) return;
+    const btn = document.createElement("button");
+    btn.className="btn";
+    btn.innerText = ar.name;
+    btn.onclick=()=>{
+      currentAreaId = ar.id;
+      openFloorSelect();
+    }
+    box.appendChild(btn);
+  })
+}
+
+function openFloorSelect(){
+  closeAllPopup();
+  document.getElementById("popupFloor").classList.remove("hidden");
+  const areaDef = AREAS_CFG.find(x=>x.id===currentAreaId);
+  const ast = getAreaState(currentAreaId);
+  document.getElementById("floorTitle").innerText = areaDef.name;
+  const mbox = document.getElementById("monsterList");
+  mbox.innerHTML = "";
+  for(let fi=0;fi<areaDef.floors.length;fi++){
+    checkFloorResurrect(currentAreaId,fi);
+    const fst = ast.floors[fi];
+    const floorDef = areaDef.floors[fi];
+    const div = document.createElement("div");
+    div.className="box";
+    div.innerHTML = `<div>第${fi+1}层 ${fst.markDone?"✅印记已解锁":"🔒印记未解锁"}</div>`;
+    const enterBtn = document.createElement("button");
+    enterBtn.className="btn btn-blue";
+    enterBtn.innerText="进入本层";
+    enterBtn.onclick=()=>{
+      currentFloorIdx = fi;
+      renderCurrentFloorMonster();
+    }
+    div.appendChild(enterBtn);
+    mbox.appendChild(div);
+  }
+}
+
+function renderCurrentFloorMonster(){
+  closeAllPopup();
+  document.getElementById("popupFloor").classList.remove("hidden");
+  const areaDef = AREAS_CFG.find(x=>x.id===currentAreaId);
+  const floorDef = areaDef.floors[currentFloorIdx];
+  const ast = getAreaState(currentAreaId);
+  const fst = ast.floors[currentFloorIdx];
+  checkFloorResurrect(currentAreaId,currentFloorIdx);
+  document.getElementById("floorTitle").innerText = areaDef.name + " 第"+(currentFloorIdx+1)+"层";
+  document.getElementById("markTip").innerText = fst.markDone?"✅印记解锁":"🔒印记未解锁";
+  const mbox = document.getElementById("monsterList");
+  mbox.innerHTML="";
+  floorDef.monsters.forEach(m=>{
+    const div = document.createElement("div");
+    div.className="box";
+    const dead = !!fst.monsterDeathTs[m.id];
+    div.innerHTML = `<div>${m.name} ${dead?"【已死亡等待复活】":"存活"} HP:${m.hp}</div>`;
+    if(!dead){
+      const fightBtn = document.createElement("button");
+      fightBtn.className="btn btn-danger";
+      fightBtn.innerText="挑战";
+      fightBtn.onclick=()=>startBattle({...m});
+      div.appendChild(fightBtn);
+    }
+    mbox.appendChild(div);
+  })
+  const boss = floorDef.boss;
+  const bossDead = !!fst.bossDeathTs;
+  const bossDiv = document.createElement("div");
+  bossDiv.className="box";
+  bossDiv.innerHTML = `<div>👹BOSS ${boss.name} ${bossDead?"【BOSS死亡等待复活】":"存活"} HP:${boss.hp}</div>`;
+  if(!bossDead){
+    const fb = document.createElement("button");
+    fb.className="btn btn-danger";
+    fb.innerText="挑战BOSS";
+    fb.onclick=()=>startBattle({...boss,isBoss:true});
+    bossDiv.appendChild(fb);
+  }
+  mbox.appendChild(bossDiv);
+}
+
+// =========战斗系统=========
+function startBattle(mon){
+  closeAllPopup();
+  document.getElementById("popupBattle").classList.remove("hidden");
+  battleTarget = mon;
+  autoBattle = false;
+  skillCd = 0;
+  refreshBattleUi();
+  document.getElementById("battleLog").innerText = "";
+  battleAppendLog(`遭遇 ${mon.name}！`);
+}
+function refreshBattleUi(){
+  if(!battleTarget) return;
+  document.getElementById("battleMonName").innerText = battleTarget.name;
+  document.getElementById("battleMonHp").innerText = Math.floor(battleTarget.hp);
+  document.getElementById("battleMonMaxHp").innerText = battleTarget.isBoss?AREAS_CFG.find(a=>a.id===currentAreaId).floors[currentFloorIdx].boss.hp:battleTarget.hp;
+  const ap = calcPlayerAttr();
+  const maxHpAll = player.maxHp + ap.addHp;
+  document.getElementById("battlePlayerHp").innerText = Math.floor(player.hp);
+  document.getElementById("battlePlayerMaxHp").innerText = maxHpAll;
+  document.getElementById("btnAuto").innerText = autoBattle?"停止自动":"自动战斗";
+  document.getElementById("battleTip").innerText = skillCd>0?`烈火剑法冷却:${skillCd}回合`:"";
+}
+function battleAppendLog(s){
+  const logDom = document.getElementById("battleLog");
+  logDom.innerHTML += s+"\n";
+  logDom.scrollTop = logDom.scrollHeight;
+}
+
+function monsterTurn(){
+  if(!battleTarget || battleTarget.hp<=0) return;
+  const ap = calcPlayerAttr();
+  let dmg = Math.max(1,battleTarget.atk - ap.def);
+  if(Math.random()<0.08){
+    dmg = Math.floor(dmg*1.25);
+    battleAppendLog(`💥怪物暴击！`);
+  }
+  player.hp -= dmg;
+  battleAppendLog(`${battleTarget.name}对你造成 ${dmg} 伤害`);
+  refreshBattleUi();
+  if(player.hp <=0){
+    battleAppendLog("你死亡！损失10%金币");
+    player.gold = Math.floor(player.gold*0.9);
+    const ap2 = calcPlayerAttr();
+    player.hp = player.maxHp + ap2.addHp;
+    autoBattle = false;
+    setTimeout(()=>{exitBattle();renderCurrentFloorMonster();refreshPlayerUi();},1200);
+    return;
+  }
+  if(autoBattle){
+    setTimeout(()=>{battleAttack()},700);
+  }
+}
+
+function battleAttack(){
+  if(!battleTarget) return;
+  const ap = calcPlayerAttr();
+  let dmg = Math.max(1,ap.atk - battleTarget.def);
+  if(Math.random()<0.12){
+    dmg = Math.floor(dmg*1.3);
+    battleAppendLog("✨你的攻击暴击！");
+  }
+  battleTarget.hp -= dmg;
+  battleAppendLog(`你攻击造成 ${dmg} 伤害`);
+  if(skillCd>0) skillCd--;
+  refreshBattleUi();
+  checkBattleMonsterDead();
+}
+
+function battleSkill(){
+  if(skillCd>0){battleAppendLog("技能冷却中");return;}
+  const ap = calcPlayerAttr();
+  let dmg = Math.floor(Math.max(1,ap.atk - battleTarget.def)*1.8);
+  battleTarget.hp -= dmg;
+  battleAppendLog(`🔥烈火剑法！造成 ${dmg} 伤害`);
+  skillCd = 3;
+  refreshBattleUi();
+  checkBattleMonsterDead();
+}
+
+function battleUsePotion(){
+  if(player.potion<=0){battleAppendLog("没有红药");return;}
+  player.potion--;
+  const ap = calcPlayerAttr();
+  const heal = Math.floor((player.maxHp+ap.addHp)*0.35);
+  player.hp = Math.min(player.maxHp+ap.addHp,player.hp+heal);
+  battleAppendLog(`喝红药恢复${heal}生命`);
+  refreshBattleUi();
+  if(autoBattle) setTimeout(()=>battleAttack(),600);
+}
+
+function battleFlee(){
+  if(Math.random()<0.45){
+    battleAppendLog("逃跑成功！");
+    autoBattle=false;
+    exitBattle();
+  }else{
+    battleAppendLog("逃跑失败！怪物发起进攻");
+    monsterTurn();
+  }
+}
+
+function toggleAutoBattle(){
+  autoBattle = !autoBattle;
+  refreshBattleUi();
+  if(autoBattle) battleAttack();
+}
+
+function checkBattleMonsterDead(){
+  if(battleTarget.hp>0){
+    setTimeout(()=>monsterTurn(),550);
+    return;
+  }
+  battleAppendLog(`✅击杀 ${battleTarget.name}`);
+  const areaDef = AREAS_CFG.find(x=>x.id===currentAreaId);
+  const ast = getAreaState(currentAreaId);
+  const fst = ast.floors[currentFloorIdx];
+  const nowTs = Date.now();
+  if(battleTarget.isBoss){
+    fst.bossDeathTs = nowTs;
+    if(battleTarget.unlockDragonCity){
+      ast.dragonCityUnlocked = true;
+    }
+  }else{
+    fst.monsterDeathTs[battleTarget.id] = nowTs;
+    if(!fst.markDone){
+      fst.markDone = true;
+      battleAppendLog("🔓本层印记已点亮，可以前往下一层");
+    }
+  }
+  //掉落金币
+  const goldDrop = battleTarget.gMin + Math.floor(Math.random()*(battleTarget.gMax-battleTarget.gMin));
+  player.gold += goldDrop;
+  battleAppendLog(`获得金币 ${goldDrop}`);
+  //掉落装备
+  if(Math.random()<0.28){
+    const pool = ["木剑","铁剑","布帽","布衣","青铜戒指","木项链"];
+    if(battleTarget.dropEquip){
+      pool.push(...battleTarget.dropEquip);
+    }
+    const dropName = pool[Math.floor(Math.random()*pool.length)];
+    const newEq = createEquipInstance(dropName,null);
+    if(bag.length < player.bagMax){
+      bag.push(newEq);
+      const qc = QUALITY_CFG[newEq.qualityKey];
+      battleAppendLog(`✨爆出【${newEq.name}】<span class="${qc.cls}">${qc.text}</span>`);
+    }else{
+      battleAppendLog("背包已满，装备丢失");
+    }
+  }
+  playerAddExp(battleTarget.exp);
+  questCheckKillProgress(battleTarget.id);
+  if(autoBattle){
+    autoBattle=false;
+    setTimeout(()=>{exitBattle();renderCurrentFloorMonster();},800);
+  }else{
+    setTimeout(()=>{exitBattle();renderCurrentFloorMonster();},1000);
+  }
+}
+
+function exitBattle(){
+  battleTarget=null;autoBattle=false;skillCd=0;
+  closeAllPopup();
+}
+
+//====背包穿戴洗练分解====
+function openBag(){
+  closeAllPopup();
+  document.getElementById("popupBag").classList.remove("hidden");
+  refreshBagUi();
+}
+function refreshBagUi(){
+  const blist = document.getElementById("bagList");
+  blist.innerHTML="";
+  document.getElementById("bagSizeTip").innerText = `(${bag.length}/${player.bagMax})`;
+  bag.forEach((eq,idx)=>{
+    const qc = QUALITY_CFG[eq.qualityKey];
+    const div = document.createElement("div");
+    div.className="box";
+    const t = getEquipTotal(eq);
+    div.innerHTML = `<div class="${qc.cls}">${eq.name}[${qc.text}]</div><div>攻:${t.atk} 防:${t.def} HP+${t.hp} 洗练${eq.refineTimes}/3</div>`;
+    const btnWrap = document.createElement("div");
+    const wearBtn = document.createElement("button");
+    wearBtn.className="btn";wearBtn.innerText="穿戴";
+    wearBtn.onclick=()=>wearEquip(idx);
+    const refineBtn = document.createElement("button");
+    refineBtn.className="btn btn-blue";refineBtn.innerText="洗练";
+    refineBtn.onclick=()=>openRefine(idx);
+    const dropBtn = document.createElement("button");
+    dropBtn.className="btn btn-danger";dropBtn.innerText="丢弃";
+    dropBtn.onclick=()=>{bag.splice(idx,1);refreshBagUi();}
+    btnWrap.appendChild(wearBtn);btnWrap.appendChild(refineBtn);btnWrap.appendChild(dropBtn);
+    div.appendChild(btnWrap);
+    blist.appendChild(div);
+  })
+  //分解列表
+  const decompBox = document.getElementById("decomposeList");
+  decompBox.innerHTML="";
+  bag.forEach((eq,idx)=>{
+    const qc = QUALITY_CFG[eq.qualityKey];
+    const dBtn = document.createElement("button");
+    dBtn.className="btn";
+    dBtn.innerText=`分解 ${eq.name}[${qc.text}]`;
+    dBtn.onclick=()=>{
+      const matGain = DECOMPOSE_MAT[eq.qualityKey];
+      matCount += matGain;
+      bag.splice(idx,1);
+      refreshBagUi();
+    }
+    decompBox.appendChild(dBtn);
+  })
+}
+
+function wearEquip(bagIdx){
+  const eq = bag[bagIdx];
+  const old = equipWorn[eq.slot];
+  if(old) bag.push(old);
+  equipWorn[eq.slot] = eq;
+  bag.splice(bagIdx,1);
+  refreshBagUi();refreshEquipUi();refreshPlayerUi();
+}
+
+function openEquipUi(){
+  closeAllPopup();
+  document.getElementById("popupEquip").classList.remove("hidden");
+  refreshEquipUi();
+}
+function refreshEquipUi(){
+  const slots = ["weapon","helmet","cloth","shoe","belt","ring","neck"];
+  const slotDomId = {
+    weapon:"slot-weapon",helmet:"slot-helmet",cloth:"slot-cloth",
+    shoe:"slot-shoe",belt:"slot-belt",ring:"slot-ring",neck:"slot-neck"
+  };
+  slots.forEach(s=>{
+    const dom = document.getElementById(slotDomId[s]);
+    const e = equipWorn[s];
+    if(!e){dom.innerText=s;dom.className="equip-slot";return;}
+    const qc = QUALITY_CFG[e.qualityKey];
+    dom.className="equip-slot "+qc.cls;
+    dom.innerText = e.name;
+    dom.onclick=()=>{
+      bag.push(e);
+      equipWorn[s]=null;
+      refreshEquipUi();refreshPlayerUi();
+    }
+  })
+}
+
+let currentRefineBagIdx = -1;
+function openRefine(idx){
+  currentRefineBagIdx = idx;
+  closeAllPopup();
+  document.getElementById("popupRefine").classList.remove("hidden");
+  const eq = bag[idx];
+  const qc = QUALITY_CFG[eq.qualityKey];
+  const ti = getEquipTotal(eq);
+  document.getElementById("refineInfo").innerHTML = `
+    <div class="${qc.cls}">${eq.name}[${qc.text}]</div>
+    <div>当前攻${ti.atk} 防${ti.def} HP+${ti.hp}</div>
+    <div>洗练次数:${eq.refineTimes}/3</div>
+    <div>洗练材料:${matCount}</div>
+  `;
+}
+function doRefine(){
+  const eq = bag[currentRefineBagIdx];
+  if(!eq) return;
+  if(eq.refineTimes>=3) return alert("最多洗练3次");
+  let risk = 0.12 + (eq.refineAtk+eq.refineDef+eq.refineHp)*0.004;
+  const consumeMat = Math.min(matCount,Math.ceil(risk/0.05));
+  risk -= consumeMat*0.05;
+  risk = Math.max(0,risk);
+  matCount -= consumeMat;
+  if(Math.random()<risk){
+    eq.refineAtk=0;eq.refineDef=0;eq.refineHp=0;
+    alert("装备洗练破损，附加属性清零！");
+  }else{
+    eq.refineAtk += Math.floor(Math.random()*6)+1;
+    eq.refineDef += Math.floor(Math.random()*4)+1;
+    if(Math.random()<0.35) eq.refineHp += Math.floor(Math.random()*12)+2;
+    eq.refineTimes +=1;
+  }
+  openRefine(currentRefineBagIdx);
+  refreshPlayerUi();
+}
+
+//商店
+function openShop(){
+  closeAllPopup();
+  document.getElementById("popupShop").classList.remove("hidden");
+  const sbox = document.getElementById("shopList");
+  sbox.innerHTML="";
+  SHOP_EQUIP_LIST.forEach(name=>{
+    const base = EQUIP_BASE[name];
+    const div = document.createElement("div");
+    div.className="box";
+    div.innerHTML = `<div>${name} 攻${base.atk} 防${base.def} 购买:${base.buy}金币</div>`;
+    const buyBtn = document.createElement("button");
+    buyBtn.className="btn btn-green";buyBtn.innerText="购买(普通品质)";
+    buyBtn.onclick=()=>{
+      if(player.gold < base.buy){alert("金币不足");return;}
+      if(bag.length >= player.bagMax){alert("背包已满");return;}
+      player.gold -= base.buy;
+      const neq = createEquipInstance(name,"normal");
+      bag.push(neq);
+      refreshPlayerUi();openShop();
+    }
+    div.appendChild(buyBtn);
+    sbox.appendChild(div);
+  })
+}
+
+// =========任务系统============
+function genOneQuest(){
+  const types = ["killMonster","collectItem","reachFloor","payGold","wearEquip"];
+  const t = types[Math.floor(Math.random()*types.length)];
+  const areaDef = AREAS_CFG[Math.floor(Math.random()*AREAS_CFG.length)];
+  const floorIdx = Math.floor(Math.random()*3);
+  const floorDef = areaDef.floors[floorIdx];
+  const mon = floorDef.monsters[Math.floor(Math.random()*floorDef.monsters.length)];
+  const equipName = Object.keys(EQUIP_BASE)[Math.floor(Math.random()*Object.keys(EQUIP_BASE).length)];
+  let q = {
+    qid:Math.random().toString(36).slice(2),
+    type:t,
+    targetId:mon.id,
+    targetName:mon.name,
+    areaId:areaDef.id,
+    floorIdx:floorIdx,
+    equipName:equipName,
+    needCount:Math.floor(Math.random()*4)+2,
+    progress:0,
+    goldReward:Math.floor(Math.random()*400)+200,
+    expReward:Math.floor(Math.random()*600)+300,
+    finished:false
+  };
+  return q;
+}
+
+function refreshQuestPool(){
+  const now = Date.now();
+  const cdLeft = Math.ceil((questRefreshTs+120*1000-now)/1000);
+  if(cdLeft>0) return;
+  questAvailable = [];
+  for(let i=0;i<5;i++) questAvailable.push(genOneQuest());
+  questRefreshTs = now;
+}
+
+function openQuestPanel(){
+  closeAllPopup();
+  document.getElementById("popupQuest").classList.remove("hidden");
+  refreshQuestPool();
+  refreshQuestUi();
+}
+
+function refreshQuestUi(){
+  document.getElementById("doingQuestCnt").innerText = questDoing.length;
+  const now = Date.now();
+  const cdLeft = Math.max(0,Math.ceil((questRefreshTs+120*1000-now)/1000));
+  document.getElementById("questCdTip").innerText = cdLeft;
+
+  const doingBox = document.getElementById("doingQuestBox");
+  doingBox.innerHTML="";
+  questDoing.forEach((q,idx)=>{
+    const div = document.createElement("div");
+    div.className="box";
+    let desc = "";
+    if(q.type==="killMonster") desc=`击杀${q.needCount}只${q.targetName} (${q.progress}/${q.needCount})`;
+    else if(q.type==="collectItem") desc=`收集${q.needCount}个${q.equipName}(${q.progress}/${q.needCount})`;
+    else if(q.type==="reachFloor") desc=`到达【${AREAS_CFG.find(a=>a.id===q.areaId).name}】第${q.floorIdx+1}层`;
+    else if(q.type==="payGold") desc=`上交${q.needCount*100}金币`;
+    else if(q.type==="wearEquip") desc=`穿戴装备【${q.equipName}】`;
+    div.innerHTML = `<div>${desc}</div><div>奖励:${q.goldReward}金币 ${q.expReward}经验</div>`;
+    if(q.finished){
+      div.style.opacity="0.45";
+      const getBtn = document.createElement("button");
+      getBtn.className="btn";getBtn.innerText="领取奖励";
+      getBtn.onclick=()=>{
+        player.gold += q.goldReward;
+        playerAddExp(q.expReward);
+        questDoing.splice(idx,1);
+        refreshQuestUi();refreshPlayerUi();
+      }
+      div.appendChild(getBtn);
+    }
+    const abandonBtn = document.createElement("button");
+    abandonBtn.className="btn btn-danger";abandonBtn.innerText="放弃";
+    abandonBtn.onclick=()=>{
+      questDoing.splice(idx,1);
+      refreshQuestUi();
+    }
+    div.appendChild(abandonBtn);
+    doingBox.appendChild(div);
+  })
+
+  const availBox = document.getElementById("availQuestBox");
+  availBox.innerHTML="";
+  questAvailable.forEach((q,idx)=>{
+    const div = document.createElement("div");
+    div.className="box";
+    let desc = "";
+    if(q.type==="killMonster") desc=`击杀${q.needCount}只${q.targetName}`;
+    else if(q.type==="collectItem") desc=`收集${q.needCount}个${q.equipName}`;
+    else if(q.type==="reachFloor") desc=`到达【${AREAS_CFG.find(a=>a.id===q.areaId).name}】第${q.floorIdx+1}层`;
+    else if(q.type==="payGold") desc=`上交${q.needCount*100}金币`;
+    else if(q.type==="wearEquip") desc=`穿戴装备【${q.equipName}】`;
+    div.innerHTML = `<div>${desc}</div><div>奖励:${q.goldReward}金币 ${q.expReward}经验</div>`;
+    const takeBtn = document.createElement("button");
+    takeBtn.className="btn btn-green";takeBtn.innerText="接取任务";
+    takeBtn.onclick=()=>{
+      if(questDoing.length>=3){alert("最多同时接3个任务");return;}
+      questDoing.push(q);
+      questAvailable.splice(idx,1);
+      refreshQuestUi();
+    }
+    div.appendChild(takeBtn);
+    availBox.appendChild(div);
+  })
+}
+
+function questCheckKillProgress(monId){
+  questDoing.forEach(q=>{
+    if(q.type==="killMonster" && q.targetId===monId && !q.finished){
+      q.progress +=1;
+      if(q.progress>=q.needCount) q.finished=true;
+    }
+  })
+}
+
+//====存档读档重置====
+function gameSave(){
+  const saveObj = {
+    player:JSON.parse(JSON.stringify(player)),
+    bag:JSON.parse(JSON.stringify(bag)),
+    equipWorn:JSON.parse(JSON.stringify(equipWorn)),
+    matCount:matCount,
+    areaState:JSON.parse(JSON.stringify(areaState)),
+    questDoing:JSON.parse(JSON.stringify(questDoing)),
+    questAvailable:JSON.parse(JSON.stringify(questAvailable)),
+    questRefreshTs:questRefreshTs
+  };
+  localStorage.setItem("legendSave",JSON.stringify(saveObj));
+  alert("存档成功");
+}
+function gameLoad(){
+  const s = localStorage.getItem("legendSave");
+  if(!s){alert("无存档");return;}
+  const d = JSON.parse(s);
+  player = d.player;
+  bag = d.bag;
+  equipWorn = d.equipWorn;
+  matCount = d.matCount;
+  areaState = d.areaState;
+  questDoing = d.questDoing;
+  questAvailable = d.questAvailable;
+  questRefreshTs = d.questRefreshTs;
+  currentAreaId=null;currentFloorIdx=null;
+  closeAllPopup();
+  refreshPlayerUi();
+  alert("读档完成");
+}
+function gameReset(){
+  if(!confirm("确定全部重置？")) return;
+  localStorage.removeItem("legendSave");
+  initPlayer();
+  closeAllPopup();
+  refreshPlayerUi();
+}
+
+//启动
+initPlayer();
+refreshPlayerUi();
+</script>
+</body>
+</html>
