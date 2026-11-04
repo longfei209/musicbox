@@ -1,18 +1,30 @@
 (function(){
-  var kws = prompt('关键词，逗号或换行分隔').split(/[,，\n]/).map(function(s){return s.trim()}).filter(Boolean);
+  var raw = prompt('关键词，逗号或换行分隔');
+  if(!raw) return;
+  var kws = raw.split(/[,，\n]/).map(function(s){return s.trim()}).filter(Boolean);
   if(!kws.length) return;
+
+  // ===== 清理上一次的高亮 =====
   document.querySelectorAll('mark[data-mh]').forEach(function(m){
     var p = m.parentNode;
     p.replaceChild(document.createTextNode(m.textContent), m);
     p.normalize();
   });
+  document.querySelectorAll('[data-mh-input]').forEach(function(el){
+    el.style.outline = '';
+    el.style.outlineOffset = '';
+    el.removeAttribute('data-mh-input');
+  });
+
   var colors = ['#ffd54f','#ff8a80','#80d8ff','#b9f6ca','#ea80fc','#ffab40'];
+
+  // ===== 1. 正文高亮（含 contenteditable 富文本框）=====
   kws.forEach(function(kw, ki){
     var color = colors[ki % colors.length];
     var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
       acceptNode: function(n){
         if(!n.parentElement) return NodeFilter.FILTER_REJECT;
-        if(n.parentElement.closest('script,style,textarea,input,select,[contenteditable],mark[data-mh]')) return NodeFilter.FILTER_REJECT;
+        if(n.parentElement.closest('script,style,noscript,textarea,input,select,mark[data-mh]')) return NodeFilter.FILTER_REJECT;
         return NodeFilter.FILTER_ACCEPT;
       }
     });
@@ -39,5 +51,42 @@
       node.parentNode.replaceChild(frag, node);
     });
   });
-  console.log('高亮完成：' + kws.join(', '));
+
+  // ===== 2. input / textarea 查找 =====
+  var firstHit = null;
+  var hitCount = 0;
+
+  document.querySelectorAll('input, textarea').forEach(function(el){
+    var type = (el.type || '').toLowerCase();
+    if(type === 'hidden' || type === 'password' || type === 'file' || el.disabled) return;
+
+    var v = el.value || '';
+    if(!v) return;
+    var lowerV = v.toLowerCase();
+    var hitIdx = -1, hitKw = '';
+
+    for(var i = 0; i < kws.length; i++){
+      var p = lowerV.indexOf(kws[i].toLowerCase());
+      if(p !== -1){ hitIdx = p; hitKw = kws[i]; break; }
+    }
+    if(hitIdx === -1) return;
+
+    el.setAttribute('data-mh-input','1');
+    el.style.outline = '2px solid #ff5252';
+    el.style.outlineOffset = '1px';
+    hitCount++;
+
+    if(!firstHit){
+      firstHit = { el: el, start: hitIdx, end: hitIdx + hitKw.length };
+    }
+  });
+
+  // 跳到第一个命中的输入框并选中匹配词
+  if(firstHit){
+    firstHit.el.focus();
+    try { firstHit.el.setSelectionRange(firstHit.start, firstHit.end); } catch(e){}
+    firstHit.el.scrollIntoView({ block: 'center' });
+  }
+
+  console.log('正文高亮 ' + kws.length + ' 个词；输入框命中 ' + hitCount + ' 个');
 })();
