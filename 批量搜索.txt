@@ -1,13 +1,12 @@
-多词高亮查找 Edge 扩展 - 代码合集
+简约多词高亮 Edge 扩展 - 完整代码
 ================================
 
 目录结构：
-multi-highlighter/
+simple-multi-highlight/
 ├── manifest.json
 ├── popup.html
 ├── popup.js
-├── content.js
-└── background.js
+└── content.js
 
 
 ================================
@@ -15,17 +14,13 @@ multi-highlighter/
 ================================
 {
   "manifest_version": 3,
-  "name": "多词高亮查找",
+  "name": "简约多词高亮",
   "version": "1.0",
-  "description": "类似 Ctrl+F，但支持同时查找并高亮多个关键词，快捷键 Ctrl+Shift+F。",
-  "permissions": ["storage", "activeTab", "scripting"],
-  "host_permissions": ["<all_urls>"],
+  "description": "只做多关键词页内高亮搜索",
+  "permissions": ["activeTab"],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "多词高亮查找"
-  },
-  "background": {
-    "service_worker": "background.js"
+    "default_title": "多词高亮"
   },
   "content_scripts": [
     {
@@ -33,16 +28,7 @@ multi-highlighter/
       "js": ["content.js"],
       "run_at": "document_idle"
     }
-  ],
-  "commands": {
-    "_execute_action": {
-      "suggested_key": {
-        "default": "Ctrl+Shift+F",
-        "mac": "Command+Shift+F"
-      },
-      "description": "打开多词高亮查找"
-    }
-  }
+  ]
 }
 
 
@@ -54,28 +40,59 @@ multi-highlighter/
 <head>
   <meta charset="utf-8">
   <style>
-    body { width: 320px; padding: 12px; font-family: system-ui; }
-    h3 { margin: 0 0 8px; font-size: 16px; }
+    body {
+      width: 300px;
+      padding: 12px;
+      font-family: system-ui, sans-serif;
+    }
+    h3 {
+      margin: 0 0 8px;
+      font-size: 16px;
+    }
     textarea {
-      width: 100%; height: 90px; box-sizing: border-box;
-      padding: 8px; border: 1px solid #ccc; border-radius: 6px;
-      resize: vertical; font-size: 13px;
+      width: 100%;
+      height: 90px;
+      box-sizing: border-box;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      resize: vertical;
+      font-size: 13px;
     }
     button {
-      margin-top: 8px; width: 100%; padding: 8px;
-      background: #0067c0; color: #fff; border: none;
-      border-radius: 6px; cursor: pointer; font-size: 14px;
+      width: 100%;
+      margin-top: 8px;
+      padding: 8px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      color: #fff;
+      background: #0067c0;
     }
-    button:hover { background: #005a9e; }
-    .hint { font-size: 11px; color: #888; margin-top: 6px; }
+    button:hover {
+      background: #005a9e;
+    }
+    #clearBtn {
+      background: #666;
+      margin-top: 4px;
+    }
+    .hint {
+      margin-top: 6px;
+      font-size: 11px;
+      color: #888;
+    }
   </style>
 </head>
 <body>
   <h3>多词高亮</h3>
-  <textarea id="kwInput" placeholder="输入关键词，用逗号或换行分隔&#10;例如：报错, 警告, TODO"></textarea>
+  <textarea
+    id="kwInput"
+    placeholder="输入关键词，用逗号或换行分隔&#10;例如：报错, 警告, TODO"
+  ></textarea>
   <button id="applyBtn">应用高亮</button>
-  <button id="clearBtn" style="background:#666; margin-top:4px;">清除高亮</button>
-  <div class="hint">快捷键：Ctrl+Shift+F</div>
+  <button id="clearBtn">清除高亮</button>
+  <div class="hint">只搜索当前网页，不修改网页结构</div>
   <script src="popup.js"></script>
 </body>
 </html>
@@ -88,172 +105,188 @@ const input = document.getElementById('kwInput');
 const applyBtn = document.getElementById('applyBtn');
 const clearBtn = document.getElementById('clearBtn');
 
-// 读取已保存的关键词
-chrome.storage.local.get({ keywords: [] }, (data) => {
-  input.value = data.keywords.join(', ');
-});
+function parseKeywords() {
+  return [
+    ...new Set(
+      input.value
+        .split(/[,，\n]/)
+        .map(s => s.trim())
+        .filter(Boolean)
+    )
+  ];
+}
 
-// 解析关键词：兼容中英文逗号、换行
-function parseKeywords(raw) {
-  return raw
-    .split(/[,，\n]/)
-    .map(k => k.trim())
-    .filter(Boolean);
+function sendMessage(message) {
+  chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
+    const tabId = tabs[0]?.id;
+    if (!tabId) return;
+
+    chrome.tabs.sendMessage(tabId, message).catch(() => {
+      // 有些页面不允许注入 content script，例如 edge:// 页面
+    });
+  });
 }
 
 applyBtn.addEventListener('click', () => {
-  const keywords = parseKeywords(input.value);
-  chrome.storage.local.set({ keywords }, () => {
-    notifyTab({ type: 'SEARCH', keywords });
+  sendMessage({
+    type: 'SEARCH',
+    keywords: parseKeywords()
   });
 });
 
 clearBtn.addEventListener('click', () => {
-  chrome.storage.local.set({ keywords: [] });
-  notifyTab({ type: 'CLEAR' });
+  sendMessage({ type: 'CLEAR' });
 });
 
-function notifyTab(message) {
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    if (tabs[0]?.id) {
-      chrome.tabs.sendMessage(tabs[0].id, message).catch(() => {});
-    }
-  });
-}
+// Ctrl+Enter 快速应用
+input.addEventListener('keydown', event => {
+  if (event.ctrlKey && event.key === 'Enter') {
+    applyBtn.click();
+  }
+});
 
 
 ================================
 文件：content.js
 ================================
-// 为不同关键词循环分配颜色
-const COLOR_PALETTE = [
-  '#ffd54f', // 黄
-  '#ff8a80', // 红
-  '#80d8ff', // 蓝
-  '#b9f6ca', // 绿
-  '#ea80fc', // 紫
-  '#ffab40', // 橙
+const COLORS = [
+  '#ffd54f',
+  '#ff8a80',
+  '#80d8ff',
+  '#b9f6ca',
+  '#ea80fc',
+  '#ffab40'
 ];
 
-let currentKeywords = [];
+const STYLE_ID = '__simple_multi_hl_style';
 
-// 主入口：执行多关键词高亮
-function runSearch(keywords) {
-  clearHighlights();
-  currentKeywords = keywords;
-  if (!keywords.length) return;
+function clearHighlights() {
+  if (!CSS.highlights) return;
 
-  // 1. 为每个关键词查找 Range
-  const keywordRanges = keywords.map((kw, index) => {
-    const ranges = findRanges(kw);
-    return { keyword: kw, index, ranges };
-  });
-
-  // 2. 注册 CSS Custom Highlight
-  // 先确保样式表存在
-  ensureHighlightStyles();
-
-  keywordRanges.forEach(({ keyword, index, ranges }) => {
-    if (!ranges.length) return;
-    const name = `kw-${index}`;
-    // 同一个关键词的所有 Range 放入一个 Highlight 实例
-    CSS.highlights.set(name, new Highlight(...ranges));
+  [...CSS.highlights.keys()].forEach(key => {
+    if (key.startsWith('mh-')) {
+      CSS.highlights.delete(key);
+    }
   });
 }
 
-// 查找文本节点中所有匹配的 Range
-function findRanges(term, root = document.body) {
+function applyHighlightStyles(count) {
+  let style = document.getElementById(STYLE_ID);
+
+  if (!style) {
+    style = document.createElement('style');
+    style.id = STYLE_ID;
+    document.head.appendChild(style);
+  }
+
+  style.textContent = Array.from({ length: count }, (_, index) => {
+    const color = COLORS[index % COLORS.length];
+    return `::highlight(mh-${index}) { background-color: ${color}; }`;
+  }).join('\n');
+}
+
+function findRanges(term) {
   const needle = term.toLocaleLowerCase();
   const ranges = [];
+
   if (!needle) return ranges;
 
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
-    acceptNode(node) {
-      const parent = node.parentElement;
-      if (!parent) return NodeFilter.FILTER_REJECT;
-      // 跳过脚本、样式、不可编辑区域，避免干扰代码框和输入框
-      if (parent.closest('script, style, noscript, textarea, [contenteditable]')) {
-        return NodeFilter.FILTER_REJECT;
+  const walker = document.createTreeWalker(
+    document.body,
+    NodeFilter.SHOW_TEXT,
+    {
+      acceptNode(node) {
+        const parent = node.parentElement;
+
+        if (!parent) return NodeFilter.FILTER_REJECT;
+
+        if (
+          parent.closest(
+            'script, style, noscript, textarea, input, select, [contenteditable]'
+          )
+        ) {
+          return NodeFilter.FILTER_REJECT;
+        }
+
+        return NodeFilter.FILTER_ACCEPT;
       }
-      return NodeFilter.FILTER_ACCEPT;
-    },
-  });
+    }
+  );
 
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
     const text = node.data.toLocaleLowerCase();
-    for (let i = text.indexOf(needle); i !== -1; i = text.indexOf(needle, i + needle.length)) {
+
+    for (
+      let index = text.indexOf(needle);
+      index !== -1;
+      index = text.indexOf(needle, index + needle.length)
+    ) {
       const range = new Range();
-      range.setStart(node, i);
-      range.setEnd(node, i + needle.length);
+      range.setStart(node, index);
+      range.setEnd(node, index + needle.length);
       ranges.push(range);
     }
   }
+
   return ranges;
 }
 
-// 动态生成 ::highlight() 样式
-function ensureHighlightStyles() {
-  if (document.getElementById('__multi_hl_style')) return;
-  const style = document.createElement('style');
-  style.id = '__multi_hl_style';
-  // 为预设的调色板生成规则
-  let css = '';
-  COLOR_PALETTE.forEach((color, i) => {
-    css += `::highlight(kw-${i}) { background-color: ${color}; }\n`;
-  });
-  style.textContent = css;
-  document.head.appendChild(style);
-}
+function runSearch(keywords) {
+  clearHighlights();
 
-// 清除所有高亮
-function clearHighlights() {
-  if (!('highlights' in CSS)) return;
-  for (const key of CSS.highlights.keys()) {
-    if (key.startsWith('kw-')) CSS.highlights.delete(key);
+  if (!keywords.length) return;
+
+  if (!CSS.highlights || !window.Highlight) {
+    console.warn('当前浏览器不支持 CSS Custom Highlight API');
+    return;
   }
-  currentKeywords = [];
+
+  applyHighlightStyles(keywords.length);
+
+  keywords.forEach((keyword, index) => {
+    const ranges = findRanges(keyword);
+
+    if (ranges.length > 0) {
+      CSS.highlights.set(`mh-${index}`, new Highlight(...ranges));
+    }
+  });
 }
 
-// 监听 popup 发来的消息
-chrome.runtime.onMessage.addListener((message) => {
+chrome.runtime.onMessage.addListener(message => {
   if (message.type === 'SEARCH') {
-    runSearch(message.keywords);
-  } else if (message.type === 'CLEAR') {
+    runSearch(message.keywords || []);
+  }
+
+  if (message.type === 'CLEAR') {
     clearHighlights();
   }
 });
 
-// 页面加载后，自动应用上次保存的关键词
-chrome.storage.local.get({ keywords: [] }, (data) => {
-  if (data.keywords.length) runSearch(data.keywords);
-});
-
 
 ================================
-文件：background.js
+安装方法
 ================================
-chrome.runtime.onInstalled.addListener(() => {
-  console.log('多词高亮查找扩展已安装');
-});
-
-
-================================
-安装使用方法
-================================
-1. 在电脑上新建文件夹：multi-highlighter
-2. 把上面的内容分别保存为对应文件：
+1. 新建文件夹：simple-multi-highlight
+2. 把上面 4 个文件分别保存进去：
    - manifest.json
    - popup.html
    - popup.js
    - content.js
-   - background.js
 3. 打开 Edge，地址栏输入：
    edge://extensions/
-4. 开启左下角“开发人员模式”
+4. 打开左下角“开发人员模式”
 5. 点击“加载解压缩的扩展”
-6. 选择 multi-highlighter 文件夹
-7. 打开任意网页，按 Ctrl+Shift+F
-8. 输入多个关键词，用逗号或换行分隔，例如：
+6. 选择 simple-multi-highlight 文件夹
+7. 打开任意网页，点击工具栏里的扩展图标
+8. 输入多个关键词，例如：
    报错, 警告, TODO
-9. 点击“应用高亮”即可同时高亮多个关键词
-10. 点击“清除高亮”可一键移除
+9. 点击“应用高亮”
+
+
+================================
+注意事项
+================================
+- 这个版本只处理当前网页，不保存关键词。
+- 需要较新的 Edge，支持 CSS Custom Highlight API。
+- edge:// 页面、PDF、部分浏览器内置页面无法注入。
+- 修改代码后，要在 edge://extensions/ 里点扩展的“刷新”，再刷新网页。
