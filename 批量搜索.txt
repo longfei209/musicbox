@@ -1,116 +1,288 @@
-(function(){
-  // 清理旧面板、旧标记、旧监听
-  var old = document.getElementById('__mh_panel');
-  if(old) old.remove();
-  document.querySelectorAll('[data-mh-mark]').forEach(function(el){
-    el.style.outline = ''; el.style.outlineOffset = ''; el.removeAttribute('data-mh-mark');
+输入框关键词标记 - Edge 扩展完整代码
+================================
+
+目录结构：
+input-marker/
+├── manifest.json
+├── popup.html
+├── popup.js
+└── content.js
+
+
+================================
+文件：manifest.json
+================================
+{
+  "manifest_version": 3,
+  "name": "输入框关键词标记",
+  "version": "1.0",
+  "description": "标记网页输入框中包含指定关键词的框，支持默认词和快捷键",
+  "permissions": ["storage", "activeTab", "scripting"],
+  "host_permissions": ["<all_urls>"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "输入框关键词标记"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+F",
+        "mac": "Command+Shift+F"
+      },
+      "description": "打开关键词设置"
+    }
+  }
+}
+
+
+================================
+文件：popup.html
+================================
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {
+      width: 300px;
+      padding: 12px;
+      font-family: system-ui, sans-serif;
+      font-size: 13px;
+    }
+    h3 {
+      margin: 0 0 8px;
+      font-size: 15px;
+    }
+    textarea {
+      width: 100%;
+      height: 80px;
+      box-sizing: border-box;
+      padding: 6px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      resize: vertical;
+      font-size: 13px;
+      font-family: inherit;
+      line-height: 1.5;
+    }
+    button {
+      width: 100%;
+      margin-top: 6px;
+      padding: 7px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      color: #fff;
+    }
+    .apply { background: #0067c0; }
+    .apply:hover { background: #005a9e; }
+    .clear { background: #666; }
+    .clear:hover { background: #555; }
+    .hint {
+      margin-top: 8px;
+      font-size: 11px;
+      color: #888;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <h3>输入框关键词标记</h3>
+  <textarea id="kwInput" placeholder="每行一个词，或用空格/逗号分隔"></textarea>
+  <button id="applyBtn" class="apply">应用并保存为默认</button>
+  <button id="clearBtn" class="clear">清除页面标记</button>
+  <div class="hint">
+    每次打开新页面会自动应用这些关键词。<br>
+    快捷键：Ctrl+Shift+F
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
+
+
+================================
+文件：popup.js
+================================
+const input = document.getElementById('kwInput');
+const applyBtn = document.getElementById('applyBtn');
+const clearBtn = document.getElementById('clearBtn');
+
+function parseKeywords(raw) {
+  return [...new Set(
+    raw.split(/[\s,，、\n]+/)
+      .map(s => s.trim())
+      .filter(Boolean)
+  )];
+}
+
+function sendMessage(msg) {
+  chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
+    const tabId = tabs[0]?.id;
+    if (!tabId) return;
+    chrome.tabs.sendMessage(tabId, msg).catch(() => {});
   });
-  document.querySelectorAll('[data-mh-tag]').forEach(function(el){ el.remove(); });
-  if(window.__mhUpdateTags){
-    window.removeEventListener('scroll', window.__mhUpdateTags, true);
-    window.removeEventListener('resize', window.__mhUpdateTags, true);
-    window.__mhUpdateTags = null;
-  }
+}
 
-  var panel = document.createElement('div');
-  panel.id = '__mh_panel';
-  panel.style.cssText = 'position:fixed;top:16px;right:16px;width:260px;background:#fff;border:1px solid #ddd;border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,.15);z-index:2147483647;font-family:system-ui;padding:12px;font-size:13px';
-  panel.innerHTML =
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
-      '<strong style="font-size:14px">输入框关键词标记</strong>' +
-      '<button id="__mh_close" style="border:none;background:transparent;font-size:18px;cursor:pointer;line-height:1;padding:0 4px">×</button>' +
-    '</div>' +
-    '<textarea id="__mh_input" placeholder="每行一个词，或用空格/逗号分隔" style="width:100%;height:70px;box-sizing:border-box;padding:6px;border:1px solid #ccc;border-radius:6px;resize:vertical;font-size:13px;font-family:inherit"></textarea>' +
-    '<div style="display:flex;gap:6px;margin-top:8px">' +
-      '<button id="__mh_run" style="flex:1;padding:6px;border:none;border-radius:6px;background:#0067c0;color:#fff;cursor:pointer;font-size:13px">标记</button>' +
-      '<button id="__mh_clear" style="flex:1;padding:6px;border:none;border-radius:6px;background:#666;color:#fff;cursor:pointer;font-size:13px">清除</button>' +
-    '</div>' +
-    '<div id="__mh_result" style="margin-top:8px;font-size:12px;color:#666"></div>';
-  document.body.appendChild(panel);
+// 加载已有默认词
+chrome.storage.local.get({ keywords: [] }, data => {
+  input.value = data.keywords.join('\n');
+});
 
-  var input = panel.querySelector('#__mh_input');
-  var runBtn = panel.querySelector('#__mh_run');
-  var clearBtn = panel.querySelector('#__mh_clear');
-  var closeBtn = panel.querySelector('#__mh_close');
-  var result = panel.querySelector('#__mh_result');
+applyBtn.addEventListener('click', () => {
+  const kws = parseKeywords(input.value);
+  chrome.storage.local.set({ keywords: kws }, () => {
+    sendMessage({ type: 'SEARCH', keywords: kws });
+    applyBtn.textContent = '已保存 ✓';
+    setTimeout(() => {
+      applyBtn.textContent = '应用并保存为默认';
+    }, 1000);
+  });
+});
 
-  var tags = [];
+clearBtn.addEventListener('click', () => {
+  sendMessage({ type: 'CLEAR' });
+});
 
-  function clearMarks(){
-    document.querySelectorAll('[data-mh-mark]').forEach(function(el){
-      el.style.outline = ''; el.style.outlineOffset = ''; el.removeAttribute('data-mh-mark');
-    });
-    document.querySelectorAll('[data-mh-tag]').forEach(function(el){ el.remove(); });
-    tags = [];
-  }
+input.addEventListener('keydown', e => {
+  if (e.ctrlKey && e.key === 'Enter') applyBtn.click();
+});
 
-  function updateTags(){
-    tags.forEach(function(t){
-      var r = t.el.getBoundingClientRect();
-      if(r.bottom < 0 || r.top > window.innerHeight){
-        t.tag.style.display = 'none';
-        return;
-      }
-      t.tag.style.display = '';
-      t.tag.style.left = Math.max(4, r.left) + 'px';
-      t.tag.style.top = Math.max(4, r.top - 20) + 'px';
-    });
-  }
 
-  function run(){
-    clearMarks();
-    var kws = [...new Set(
-      input.value.split(/[\s,，、\n]+/).map(function(s){return s.trim()}).filter(Boolean)
-    )];
-    if(!kws.length){ result.textContent = '请输入关键词'; return; }
+================================
+文件：content.js
+================================
+let tags = [];
 
-    var skip = ['hidden','password','file','checkbox','radio','submit','button','reset','image','range','color','date','time','month','week'];
-    var boxCount = 0;
+function clearMarks() {
+  document.querySelectorAll('[data-mh-mark]').forEach(el => {
+    el.style.outline = '';
+    el.style.outlineOffset = '';
+    el.removeAttribute('data-mh-mark');
+  });
+  document.querySelectorAll('[data-mh-tag]').forEach(el => el.remove());
+  tags = [];
+  window.removeEventListener('scroll', updateTags, true);
+  window.removeEventListener('resize', updateTags, true);
+}
 
-    document.querySelectorAll('input, textarea').forEach(function(el){
-      if(el.closest('#__mh_panel')) return;
-      var type = (el.type || 'text').toLowerCase();
-      if(skip.indexOf(type) !== -1 || el.disabled) return;
-      var v = el.value || '';
-      if(!v) return;
+function updateTags() {
+  tags.forEach(t => {
+    const r = t.el.getBoundingClientRect();
+    if (r.bottom < 0 || r.top > window.innerHeight) {
+      t.tag.style.display = 'none';
+      return;
+    }
+    t.tag.style.display = '';
+    t.tag.style.left = Math.max(4, r.left) + 'px';
+    t.tag.style.top = Math.max(4, r.top - 20) + 'px';
+  });
+}
 
-      var lv = v.toLowerCase();
-      var matched = kws.filter(function(kw){ return lv.indexOf(kw.toLowerCase()) !== -1; });
-      if(!matched.length) return;
+function markInputs(keywords) {
+  clearMarks();
+  if (!keywords.length) return;
 
-      el.setAttribute('data-mh-mark','1');
-      el.style.outline = '2px solid #ff8a00';
-      el.style.outlineOffset = '1px';
+  const skip = [
+    'hidden', 'password', 'file', 'checkbox', 'radio',
+    'submit', 'button', 'reset', 'image', 'range',
+    'color', 'date', 'time', 'month', 'week'
+  ];
 
-      var tag = document.createElement('div');
-      tag.setAttribute('data-mh-tag','1');
-      tag.textContent = matched.join(' · ');
-      tag.style.cssText = 'position:fixed;background:#ff8a00;color:#fff;font-size:11px;line-height:16px;padding:0 6px;border-radius:8px;z-index:2147483646;pointer-events:none;font-family:system-ui;white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis';
-      document.body.appendChild(tag);
-      tags.push({ el: el, tag: tag });
+  document.querySelectorAll('input, textarea').forEach(el => {
+    const type = (el.type || 'text').toLowerCase();
+    if (skip.indexOf(type) !== -1 || el.disabled) return;
 
-      boxCount++;
-    });
+    const v = el.value || '';
+    if (!v) return;
 
+    const lv = v.toLowerCase();
+    const matched = keywords.filter(kw => lv.indexOf(kw.toLowerCase()) !== -1);
+    if (!matched.length) return;
+
+    el.setAttribute('data-mh-mark', '1');
+    el.style.outline = '2px solid #ff8a00';
+    el.style.outlineOffset = '1px';
+
+    const tag = document.createElement('div');
+    tag.setAttribute('data-mh-tag', '1');
+    tag.textContent = matched.join(' · ');
+    tag.style.cssText =
+      'position:fixed;background:#ff8a00;color:#fff;font-size:11px;' +
+      'line-height:16px;padding:0 6px;border-radius:8px;' +
+      'z-index:2147483646;pointer-events:none;font-family:system-ui;' +
+      'white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis';
+    document.body.appendChild(tag);
+
+    tags.push({ el, tag });
+  });
+
+  if (tags.length) {
     updateTags();
     window.addEventListener('scroll', updateTags, true);
     window.addEventListener('resize', updateTags, true);
-    window.__mhUpdateTags = updateTags;
-
-    result.textContent = '共 ' + boxCount + ' 个框匹配';
   }
+}
 
-  runBtn.onclick = run;
-  clearBtn.onclick = function(){ clearMarks(); result.textContent = ''; };
-  closeBtn.onclick = function(){
-    clearMarks();
-    if(window.__mhUpdateTags){
-      window.removeEventListener('scroll', window.__mhUpdateTags, true);
-      window.removeEventListener('resize', window.__mhUpdateTags, true);
-      window.__mhUpdateTags = null;
-    }
-    panel.remove();
-  };
+chrome.runtime.onMessage.addListener(msg => {
+  if (msg.type === 'SEARCH') markInputs(msg.keywords || []);
+  if (msg.type === 'CLEAR') clearMarks();
+});
 
-  input.focus();
-})();
+// 页面加载时自动应用默认词（延迟一点，等动态内容渲染）
+chrome.storage.local.get({ keywords: [] }, data => {
+  if (!data.keywords.length) return;
+
+  const apply = () => setTimeout(() => markInputs(data.keywords), 300);
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', apply);
+  } else {
+    apply();
+  }
+});
+
+
+================================
+安装方法
+================================
+1. 新建文件夹：input-marker
+2. 把上面 4 个文件分别保存进去：
+   - manifest.json
+   - popup.html
+   - popup.js
+   - content.js
+3. 打开 Edge，地址栏输入：
+   edge://extensions/
+4. 打开左下角“开发人员模式”
+5. 点击“加载解压缩的扩展”
+6. 选择 input-marker 文件夹
+7. 按 Ctrl+Shift+F 打开面板，输入关键词，点“应用并保存为默认”
+
+
+================================
+使用说明
+================================
+- 面板里每行一个词，或用空格/逗号分隔都行
+- 点“应用并保存为默认”：立刻标记当前页 + 存为默认词
+- 之后每次打开新网页，会自动用默认词标记输入框
+- 有匹配的输入框：橙色边框 + 右上角标签写明命中了哪些词
+- 标签跟着页面滚动自动调整，滚出屏幕自动隐藏
+- 点“清除页面标记”可随时去掉标记
+- 修改默认词：快捷键唤起面板，改完再点“应用并保存为默认”
+
+
+================================
+注意事项
+================================
+- 快捷键 Ctrl+Shift+F 如果和其他扩展冲突，去 edge://extensions/shortcuts 改
+- edge:// 页面、PDF、部分内置页无法注入，标签不会显示
+- 动态加载的输入框（如点击按钮后才出现）不会自动标记，刷新页面或重新应用即可
+- 修改代码后，要在 edge://extensions/ 里点扩展的“刷新”，再刷新网页
