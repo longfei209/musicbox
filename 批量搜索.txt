@@ -4,89 +4,103 @@
   var kws = raw.split(/[,，\n]/).map(function(s){return s.trim()}).filter(Boolean);
   if(!kws.length) return;
 
-  // ===== 清理上一次的高亮 =====
-  document.querySelectorAll('mark[data-mh]').forEach(function(m){
-    var p = m.parentNode;
-    p.replaceChild(document.createTextNode(m.textContent), m);
-    p.normalize();
-  });
   document.querySelectorAll('[data-mh-input]').forEach(function(el){
-    el.style.outline = '';
-    el.style.outlineOffset = '';
-    el.removeAttribute('data-mh-input');
+    el.style.outline = ''; el.style.outlineOffset = ''; el.removeAttribute('data-mh-input');
   });
+  document.querySelectorAll('[data-mh-label]').forEach(function(el){ el.remove(); });
+  var ob = document.getElementById('__mh_bar'); if(ob) ob.remove();
 
-  var colors = ['#ffd54f','#ff8a80','#80d8ff','#b9f6ca','#ea80fc','#ffab40'];
-
-  // ===== 1. 正文高亮（含 contenteditable 富文本框）=====
-  kws.forEach(function(kw, ki){
-    var color = colors[ki % colors.length];
-    var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
-      acceptNode: function(n){
-        if(!n.parentElement) return NodeFilter.FILTER_REJECT;
-        if(n.parentElement.closest('script,style,noscript,textarea,input,select,mark[data-mh]')) return NodeFilter.FILTER_REJECT;
-        return NodeFilter.FILTER_ACCEPT;
-      }
-    });
-    var targets = [];
-    while(walker.nextNode()) targets.push(walker.currentNode);
-    var lower = kw.toLowerCase();
-    targets.forEach(function(node){
-      var text = node.data;
-      var idx = text.toLowerCase().indexOf(lower);
-      if(idx === -1) return;
-      var frag = document.createDocumentFragment();
-      var last = 0;
-      while(idx !== -1){
-        frag.appendChild(document.createTextNode(text.slice(last, idx)));
-        var mark = document.createElement('mark');
-        mark.setAttribute('data-mh','1');
-        mark.style.backgroundColor = color;
-        mark.textContent = text.slice(idx, idx + kw.length);
-        frag.appendChild(mark);
-        last = idx + kw.length;
-        idx = text.toLowerCase().indexOf(lower, last);
-      }
-      frag.appendChild(document.createTextNode(text.slice(last)));
-      node.parentNode.replaceChild(frag, node);
-    });
-  });
-
-  // ===== 2. input / textarea 查找 =====
-  var firstHit = null;
-  var hitCount = 0;
+  var allHits = [];
+  var skip = ['hidden','password','file','checkbox','radio','submit','button','reset','image','range','color','date','time','month','week'];
 
   document.querySelectorAll('input, textarea').forEach(function(el){
-    var type = (el.type || '').toLowerCase();
-    if(type === 'hidden' || type === 'password' || type === 'file' || el.disabled) return;
+    var type = (el.type || 'text').toLowerCase();
+    if(skip.indexOf(type) !== -1 || el.disabled) return;
+    var v = el.value || ''; if(!v) return;
 
-    var v = el.value || '';
-    if(!v) return;
-    var lowerV = v.toLowerCase();
-    var hitIdx = -1, hitKw = '';
+    var lv = v.toLowerCase(), boxHits = [];
+    kws.forEach(function(kw){
+      var lk = kw.toLowerCase(), i = lv.indexOf(lk);
+      while(i !== -1){ boxHits.push({s:i, e:i+kw.length, kw:kw}); i = lv.indexOf(lk, i + lk.length); }
+    });
+    if(!boxHits.length) return;
 
-    for(var i = 0; i < kws.length; i++){
-      var p = lowerV.indexOf(kws[i].toLowerCase());
-      if(p !== -1){ hitIdx = p; hitKw = kws[i]; break; }
-    }
-    if(hitIdx === -1) return;
+    boxHits.sort(function(a,b){ return a.s - b.s; });
+    var f = [], last = -1;
+    boxHits.forEach(function(h){ if(h.s >= last){ f.push(h); last = h.e; } });
 
     el.setAttribute('data-mh-input','1');
     el.style.outline = '2px solid #ff5252';
     el.style.outlineOffset = '1px';
-    hitCount++;
+    f.forEach(function(h){ allHits.push({ el:el, s:h.s, e:h.e }); });
 
-    if(!firstHit){
-      firstHit = { el: el, start: hitIdx, end: hitIdx + hitKw.length };
-    }
+    var r = el.getBoundingClientRect();
+    var top = r.top - 20; if(top < 4) top = r.bottom + 4;
+    var lb = document.createElement('div');
+    lb.setAttribute('data-mh-label','1');
+    lb.textContent = f.length + ' 处';
+    lb.style.cssText = 'position:fixed;left:' + Math.max(4, r.right - 46) + 'px;top:' + top + 'px;background:#ff5252;color:#fff;font-size:11px;line-height:16px;padding:0 6px;border-radius:8px;z-index:2147483647;pointer-events:none;font-family:system-ui;white-space:nowrap';
+    document.body.appendChild(lb);
   });
 
-  // 跳到第一个命中的输入框并选中匹配词
-  if(firstHit){
-    firstHit.el.focus();
-    try { firstHit.el.setSelectionRange(firstHit.start, firstHit.end); } catch(e){}
-    firstHit.el.scrollIntoView({ block: 'center' });
+  if(!allHits.length){ alert('输入框里没有找到匹配'); return; }
+
+  var cur = 0;
+
+  function go(i){
+    if(i < 0) i = allHits.length - 1;
+    if(i >= allHits.length) i = 0;
+    cur = i;
+    var h = allHits[i];
+    h.el.focus();
+    try { h.el.setSelectionRange(h.s, h.e); } catch(e){}
+    h.el.scrollIntoView({ block:'center', behavior:'smooth' });
+    document.getElementById('__mh_info').textContent = (cur+1) + ' / ' + allHits.length;
   }
 
-  console.log('正文高亮 ' + kws.length + ' 个词；输入框命中 ' + hitCount + ' 个');
+  var bar = document.createElement('div');
+  bar.id = '__mh_bar';
+  bar.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#222;color:#fff;padding:6px 12px;border-radius:20px;z-index:2147483647;font-family:system-ui;font-size:13px;box-shadow:0 2px 10px rgba(0,0,0,.3);display:flex;align-items:center;gap:8px';
+
+  var info = document.createElement('span');
+  info.id = '__mh_info';
+  bar.appendChild(info);
+
+  var pb = document.createElement('button');
+  pb.textContent = '上一个';
+  pb.style.cssText = 'background:#444;color:#fff;border:none;padding:3px 8px;border-radius:10px;cursor:pointer;font-size:12px;font-family:inherit';
+  pb.onclick = function(){ go(cur - 1); };
+  bar.appendChild(pb);
+
+  var nb = document.createElement('button');
+  nb.textContent = '下一个';
+  nb.style.cssText = 'background:#0067c0;color:#fff;border:none;padding:3px 8px;border-radius:10px;cursor:pointer;font-size:12px;font-family:inherit';
+  nb.onclick = function(){ go(cur + 1); };
+  bar.appendChild(nb);
+
+  var cb = document.createElement('button');
+  cb.textContent = '×';
+  cb.style.cssText = 'background:transparent;color:#fff;border:none;cursor:pointer;font-size:18px;padding:0 4px;line-height:1';
+  cb.onclick = function(){
+    bar.remove();
+    document.querySelectorAll('[data-mh-label]').forEach(function(el){ el.remove(); });
+    document.querySelectorAll('[data-mh-input]').forEach(function(el){
+      el.style.outline = ''; el.style.outlineOffset = ''; el.removeAttribute('data-mh-input');
+    });
+    document.removeEventListener('keydown', kh, true);
+  };
+  bar.appendChild(cb);
+  document.body.appendChild(bar);
+
+  var kh = function(e){
+    if(!document.getElementById('__mh_bar')) return;
+    if(e.key === 'Enter' && !e.isComposing){
+      e.preventDefault(); e.stopPropagation();
+      go(e.shiftKey ? cur - 1 : cur + 1);
+    } else if(e.key === 'Escape'){ cb.click(); }
+  };
+  document.addEventListener('keydown', kh, true);
+
+  go(0);
+  console.log('输入框命中：共 ' + allHits.length + ' 处，涉及 ' + document.querySelectorAll('[data-mh-input]').length + ' 个框');
 })();
