@@ -1,5 +1,5 @@
-输入框关键词标记 - Edge 扩展完整代码
-================================
+输入框关键词标记 - Edge 扩展完整代码（优化版）
+================================================
 
 目录结构：
 input-marker/
@@ -15,7 +15,7 @@ input-marker/
 {
   "manifest_version": 3,
   "name": "输入框关键词标记",
-  "version": "1.0",
+  "version": "1.1",
   "description": "标记网页输入框中包含指定关键词的框，支持默认词和快捷键",
   "permissions": ["storage", "activeTab", "scripting"],
   "host_permissions": ["<all_urls>"],
@@ -60,49 +60,64 @@ input-marker/
       margin: 0 0 8px;
       font-size: 15px;
     }
-    textarea {
+    input[type="text"] {
       width: 100%;
-      height: 80px;
       box-sizing: border-box;
-      padding: 6px;
+      padding: 8px;
       border: 1px solid #ccc;
       border-radius: 6px;
-      resize: vertical;
       font-size: 13px;
       font-family: inherit;
-      line-height: 1.5;
+      outline: none;
+    }
+    input[type="text"]:focus {
+      border-color: #0067c0;
     }
     button {
-      width: 100%;
-      margin-top: 6px;
       padding: 7px;
       border: none;
       border-radius: 6px;
       cursor: pointer;
       font-size: 13px;
       color: #fff;
+      font-family: inherit;
     }
-    .apply { background: #0067c0; }
-    .apply:hover { background: #005a9e; }
+    .row {
+      display: flex;
+      gap: 6px;
+      margin-top: 6px;
+    }
+    .row button { flex: 1; }
+    .search { background: #0067c0; width: 100%; margin-top: 8px; }
+    .search:hover { background: #005a9e; }
+    .save { background: #2b7a78; }
+    .save:hover { background: #226b69; }
     .clear { background: #666; }
     .clear:hover { background: #555; }
-    .hint {
+    #status {
       margin-top: 8px;
+      font-size: 12px;
+      color: #666;
+      min-height: 16px;
+    }
+    .hint {
+      margin-top: 4px;
       font-size: 11px;
-      color: #888;
+      color: #999;
       line-height: 1.5;
     }
   </style>
 </head>
 <body>
   <h3>输入框关键词标记</h3>
-  <textarea id="kwInput" placeholder="每行一个词，或用空格/逗号分隔"></textarea>
-  <button id="applyBtn" class="apply">应用并保存为默认</button>
-  <button id="clearBtn" class="clear">清除页面标记</button>
-  <div class="hint">
-    每次打开新页面会自动应用这些关键词。<br>
-    快捷键：Ctrl+Shift+F
+  <input id="kwInput" type="text" placeholder="多个词用空格或逗号分隔，回车即搜索">
+  <button id="searchBtn" class="search">搜索（Enter）</button>
+  <div class="row">
+    <button id="saveBtn" class="save">设为默认</button>
+    <button id="clearBtn" class="clear">清除</button>
   </div>
+  <div id="status"></div>
+  <div class="hint">快捷键：Ctrl+Shift+F　·　空格分隔多个词</div>
   <script src="popup.js"></script>
 </body>
 </html>
@@ -112,47 +127,72 @@ input-marker/
 文件：popup.js
 ================================
 const input = document.getElementById('kwInput');
-const applyBtn = document.getElementById('applyBtn');
+const searchBtn = document.getElementById('searchBtn');
+const saveBtn = document.getElementById('saveBtn');
 const clearBtn = document.getElementById('clearBtn');
+const status = document.getElementById('status');
 
 function parseKeywords(raw) {
   return [...new Set(
-    raw.split(/[\s,，、\n]+/)
+    raw.split(/[\s,，、]+/)
       .map(s => s.trim())
       .filter(Boolean)
   )];
 }
 
-function sendMessage(msg) {
-  chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
-    const tabId = tabs[0]?.id;
-    if (!tabId) return;
-    chrome.tabs.sendMessage(tabId, msg).catch(() => {});
+function send(msg) {
+  return new Promise(resolve => {
+    chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
+      const tabId = tabs[0]?.id;
+      if (!tabId) return resolve(null);
+      chrome.tabs.sendMessage(tabId, msg, resp => {
+        if (chrome.runtime.lastError) return resolve(null);
+        resolve(resp);
+      });
+    });
   });
 }
 
-// 加载已有默认词
+// 打开面板时载入默认词，自动聚焦并全选，直接回车即可搜默认词
 chrome.storage.local.get({ keywords: [] }, data => {
-  input.value = data.keywords.join('\n');
+  input.value = data.keywords.join(' ');
+  input.focus();
+  input.select();
 });
 
-applyBtn.addEventListener('click', () => {
+async function doSearch() {
   const kws = parseKeywords(input.value);
-  chrome.storage.local.set({ keywords: kws }, () => {
-    sendMessage({ type: 'SEARCH', keywords: kws });
-    applyBtn.textContent = '已保存 ✓';
-    setTimeout(() => {
-      applyBtn.textContent = '应用并保存为默认';
-    }, 1000);
+  if (!kws.length) { status.textContent = '请输入关键词'; return; }
+  const resp = await send({ type: 'SEARCH', keywords: kws });
+  status.textContent = resp
+    ? `已标记 ${resp.count} 个框`
+    : '当前页面不支持标记';
+}
+
+async function doSave() {
+  const kws = parseKeywords(input.value);
+  if (!kws.length) { status.textContent = '请输入关键词'; return; }
+  chrome.storage.local.set({ keywords: kws }, async () => {
+    const resp = await send({ type: 'SEARCH', keywords: kws });
+    status.textContent = `已保存默认词，标记 ${resp ? resp.count : 0} 个框`;
   });
-});
+}
 
-clearBtn.addEventListener('click', () => {
-  sendMessage({ type: 'CLEAR' });
-});
+async function doClear() {
+  await send({ type: 'CLEAR' });
+  status.textContent = '已清除标记';
+}
 
+searchBtn.onclick = doSearch;
+saveBtn.onclick = doSave;
+clearBtn.onclick = doClear;
+
+// Enter 搜索，中文输入法选词时不误触发
 input.addEventListener('keydown', e => {
-  if (e.ctrlKey && e.key === 'Enter') applyBtn.click();
+  if (e.key === 'Enter' && !e.isComposing) {
+    e.preventDefault();
+    doSearch();
+  }
 });
 
 
@@ -188,7 +228,7 @@ function updateTags() {
 
 function markInputs(keywords) {
   clearMarks();
-  if (!keywords.length) return;
+  if (!keywords.length) return 0;
 
   const skip = [
     'hidden', 'password', 'file', 'checkbox', 'radio',
@@ -229,14 +269,22 @@ function markInputs(keywords) {
     window.addEventListener('scroll', updateTags, true);
     window.addEventListener('resize', updateTags, true);
   }
+
+  return tags.length;
 }
 
-chrome.runtime.onMessage.addListener(msg => {
-  if (msg.type === 'SEARCH') markInputs(msg.keywords || []);
-  if (msg.type === 'CLEAR') clearMarks();
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg.type === 'SEARCH') {
+    const count = markInputs(msg.keywords || []);
+    sendResponse({ count });
+  } else if (msg.type === 'CLEAR') {
+    clearMarks();
+    sendResponse({ count: 0 });
+  }
+  return true;
 });
 
-// 页面加载时自动应用默认词（延迟一点，等动态内容渲染）
+// 页面加载时自动应用默认词
 chrome.storage.local.get({ keywords: [] }, data => {
   if (!data.keywords.length) return;
 
@@ -264,25 +312,42 @@ chrome.storage.local.get({ keywords: [] }, data => {
 4. 打开左下角“开发人员模式”
 5. 点击“加载解压缩的扩展”
 6. 选择 input-marker 文件夹
-7. 按 Ctrl+Shift+F 打开面板，输入关键词，点“应用并保存为默认”
+7. 按 Ctrl+Shift+F 打开面板
 
 
 ================================
 使用说明
 ================================
-- 面板里每行一个词，或用空格/逗号分隔都行
-- 点“应用并保存为默认”：立刻标记当前页 + 存为默认词
-- 之后每次打开新网页，会自动用默认词标记输入框
+【搜索】
+- 打开面板后，输入框自动全选默认词
+- 直接按 Enter → 立即搜索并标记当前页
+- 想换词 → 直接打字覆盖，再按 Enter
+
+【设为默认】
+- 输入框里的词会保存下来
+- 每次打开新网页，自动用这些词标记输入框
+- 保存的同时也会立即标记当前页
+
+【清除】
+- 去掉当前页所有橙色边框和标签
+
+【分隔方式】
+- 空格、逗号、顿号都行，例如：
+  报错 警告 TODO
+  报错, 警告, TODO
+  报错、警告、TODO
+
+【标记效果】
 - 有匹配的输入框：橙色边框 + 右上角标签写明命中了哪些词
 - 标签跟着页面滚动自动调整，滚出屏幕自动隐藏
-- 点“清除页面标记”可随时去掉标记
-- 修改默认词：快捷键唤起面板，改完再点“应用并保存为默认”
+- 面板底部显示“已标记 X 个框”
 
 
 ================================
 注意事项
 ================================
-- 快捷键 Ctrl+Shift+F 如果和其他扩展冲突，去 edge://extensions/shortcuts 改
-- edge:// 页面、PDF、部分内置页无法注入，标签不会显示
-- 动态加载的输入框（如点击按钮后才出现）不会自动标记，刷新页面或重新应用即可
+- 快捷键 Ctrl+Shift+F 如果冲突，去 edge://extensions/shortcuts 改
+- edge:// 页面、PDF、部分内置页无法注入，不会显示标记
+- 扩展只标记“已经有内容”的输入框，空输入框不标
+- 动态加载的输入框不会自动标记，刷新页面或重新搜索即可
 - 修改代码后，要在 edge://extensions/ 里点扩展的“刷新”，再刷新网页
