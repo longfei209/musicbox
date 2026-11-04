@@ -1,1 +1,43 @@
-javascript:(function(){var k=prompt('输入关键词，逗号分隔：');if(!k)return;var ks=k.split(/[,，]/).map(s=>s.trim()).filter(Boolean);if(!CSS.highlights)return alert('浏览器不支持');[...CSS.highlights.keys()].forEach(x=>x.startsWith('bm-')&&CSS.highlights.delete(x));var st=document.getElementById('__bm_hl')||document.createElement('style');st.id='__bm_hl';document.head.appendChild(st);st.textContent=ks.map((_,i)=>`::highlight(bm-${i}){background:#ffd54f}`).join('');ks.forEach((kw,i)=>{var ns=[],w=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT,{acceptNode(n){return n.parentElement&&!n.parentElement.closest('script,style,textarea,input,[contenteditable]')?NodeFilter.FILTER_ACCEPT:NodeFilter.FILTER_REJECT}});for(var n=w.nextNode();n;n=w.nextNode()){var t=n.data.toLowerCase(),h=kw.toLowerCase();for(var j=t.indexOf(h);j!==-1;j=t.indexOf(h,j+h.length)){var r=new Range();r.setStart(n,j);r.setEnd(n,j+h.length);ns.push(r)}}ns.length&&CSS.highlights.set(`bm-${i}`,new Highlight(...ns))})})();
+(function(){
+  var kws = prompt('关键词，逗号或换行分隔').split(/[,，\n]/).map(function(s){return s.trim()}).filter(Boolean);
+  if(!kws.length) return;
+  document.querySelectorAll('mark[data-mh]').forEach(function(m){
+    var p = m.parentNode;
+    p.replaceChild(document.createTextNode(m.textContent), m);
+    p.normalize();
+  });
+  var colors = ['#ffd54f','#ff8a80','#80d8ff','#b9f6ca','#ea80fc','#ffab40'];
+  kws.forEach(function(kw, ki){
+    var color = colors[ki % colors.length];
+    var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+      acceptNode: function(n){
+        if(!n.parentElement) return NodeFilter.FILTER_REJECT;
+        if(n.parentElement.closest('script,style,textarea,input,select,[contenteditable],mark[data-mh]')) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    });
+    var targets = [];
+    while(walker.nextNode()) targets.push(walker.currentNode);
+    var lower = kw.toLowerCase();
+    targets.forEach(function(node){
+      var text = node.data;
+      var idx = text.toLowerCase().indexOf(lower);
+      if(idx === -1) return;
+      var frag = document.createDocumentFragment();
+      var last = 0;
+      while(idx !== -1){
+        frag.appendChild(document.createTextNode(text.slice(last, idx)));
+        var mark = document.createElement('mark');
+        mark.setAttribute('data-mh','1');
+        mark.style.backgroundColor = color;
+        mark.textContent = text.slice(idx, idx + kw.length);
+        frag.appendChild(mark);
+        last = idx + kw.length;
+        idx = text.toLowerCase().indexOf(lower, last);
+      }
+      frag.appendChild(document.createTextNode(text.slice(last)));
+      node.parentNode.replaceChild(frag, node);
+    });
+  });
+  console.log('高亮完成：' + kws.join(', '));
+})();
